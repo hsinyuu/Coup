@@ -1,8 +1,8 @@
 import logging
 import json
+from channels.layers import get_channel_layer
 from channels.consumer import AsyncConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer, JsonWebsocketConsumer
-from channels.layers import get_channel_layer
 from game.coup_game import CoupGame
 
 names = ['Labrador Dog', 'Guinea Pig', 'Gold Fish', 'Chestnut Mushroom', 'Cordless Brush', 'Green Car']
@@ -54,14 +54,10 @@ class PlayerConsumer(AsyncWebsocketConsumer):
 
         if header == 'chat-message':
             await self.broadcast_message_to_room(message)
-        elif header == 'game-actions':
-            pass
-        elif header == 'game-counteractions':
-            pass
-        elif header == 'game-challenge':
+        elif header in ('game-actions', 'game-counteractions', 'game-challenge'):
             pass
         elif header == 'start-game':
-            await self.send_message_to_game_engine(header='start_game', message=None)
+            await self.send_message_to_game_engine(handler='start_game', message=None)
         else:
             logging.error(f"Received bad message type {header}: {message} from client")
 
@@ -76,6 +72,35 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         logging.info(f'Received message from game-engine {event}')
         await self.send_message_to_client(header=event.get('header'), message=event.get('message'))
     
+    async def game_message(self, event):
+        logging.info(f'Received message from game {event}')
+        await self.send_message_to_client(header=event.get('header'), message=event.get('message'))
+
+    async def game_state_update(self, event):
+        """Update interface of the client (valid buttons etc.)
+        {
+            player0: {
+                'player-valid-moves': [
+                    'challenge',
+                ]
+            }
+            player1: {
+                'player-valid-moves': [
+                ]
+            }
+        }
+        """
+        game_state_message = event.get('message')
+        if self.player_name not in game_state_message:
+            logging.error(f"Missing player {self.player_name}in game state update {game_state_message}")
+            return
+        player_game_state_message = game_state_message.get(self.player_name)
+        logging.debug(f"Sending game state {player_game_state_message}")
+        await self.send_message_to_client(
+            header=player_game_state_message.get('header'), 
+            message=player_game_state_message.get('message')
+        )
+    
     async def send_message_to_client(self, header, message):
         logging.info(f'Send message to client {header}:{message}')
         await self.send(
@@ -87,10 +112,10 @@ class PlayerConsumer(AsyncWebsocketConsumer):
             )
         )
     
-    async def send_message_to_game_engine(self, message_type, message):
+    async def send_message_to_game_engine(self, handler, message):
         await self.channel_layer.send(
             'game-engine', {
-                'type': message_type,
+                'type': handler,
                 'sender': self.player_name,
                 'room_group_name': self.room_name,
                 'message': message
@@ -106,31 +131,34 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         )
 
 class GameEngineConsumer(AsyncConsumer):
+    """Game engine manages currently ongoing games, redirect incoming messages to current games by room name.
+    The indiividual game instance will broadcast update messages."""
     def __init__(self, *args, **kwargs):
         super(GameEngineConsumer,self).__init__(*args, **kwargs)
         self.name = 'game-engine'
         self.channel_layer = get_channel_layer()
-        self.current_players = list()
-        self.coup_game = CoupGame()
-
+        self.games = dict()
+    
     async def start_game(self, event):
-        room_name = event.get('room_group_name')
         logging.info(f"Received message {event}")
-        # TODO: Change valid number of players to 2
-        if self.coup_game.get_num_players() == 0:
-            logging.error("Game engine try to start game but there are no players in the game")
-            await self.broadcast_message_to_room(room_name, header='chat-message', message='Error: Not enough player.')
-            return
-        self.coup_game.start_game()
-        await self.broadcast_message_to_room(room_name, header='chat-message', message='Game Start')
-        await self.broadcast_message_to_room(room_name, header='player-valid-moves', message=[])
+        room_name = event.get('room_group_name')
+        room_game = self.games[room_name]
+        await room_game.start_game()
 
     async def join_game(self, event):
-        room_name = event.get('room_group_name')
         logging.info(f"Received message {event}")
-        self.current_players.append(event.get('sender'))
-        await self.broadcast_message_to_room(room_name, header='player-list', message=self.current_players)
-        await self.broadcast_message_to_room(room_name, header='chat-message', message=f"Master: {event.get('sender')} joined the room")
+        room_name = event.get('room_group_name')
+        new_player = event.get('sender')
+
+        if room_name in self.games:
+            self.games[room_name].add_player(new_player)
+        else:
+            self.games[room_name] = CoupGame(room_name)
+            self.games[room_name].add_player(new_player)
+
+        await self.games[room_name].ping()
+        await self.broadcast_message_to_room(room_name, header='player-list', message=self.games[room_name].get_player_names())
+        await self.broadcast_message_to_room(room_name, header='chat-message', message=f"Master: {new_player} joined the room")
     
     async def broadcast_message_to_room(self, room_name, header, message):
         logging.info(f'game-engine broadcasting header:{header}, message:{message}')

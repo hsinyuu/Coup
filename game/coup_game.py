@@ -1,9 +1,13 @@
-from random import shuffle
+import logging
 import enum
+from random import shuffle
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 
 class Actions(enum.Enum):
     INCOME = 'income'
-    FOREIGN_AID = 'foreign_aid'
+    FOREIGN_AID = 'foreign-aid'
     COUP = 'coup'
     TAX = 'tax'
     ASSASINATE = 'assassinate'
@@ -11,9 +15,9 @@ class Actions(enum.Enum):
     EXCHANGE = 'exchange'
 
 class Counteractions(enum.Enum):
-    BLOCK_FOREIGN_AID = 'block_foreign_aid'
-    BLOCK_ASSASSINATION = 'block_assassination'
-    BLOCK_STEALING = 'block_stealing'
+    BLOCK_FOREIGN_AID = 'block-foreign_aid'
+    BLOCK_ASSASSINATION = 'block-assassination'
+    BLOCK_STEALING = 'block-stealing'
 
 class Influence(enum.Enum):
     DUKE = 'duke'
@@ -58,6 +62,9 @@ class CoupGamePlayer(object):
         self.coins = 0
         self._owned_influence = list()  # Cards faced down
         self._lost_influence = list()   # Cards revealed
+    
+    def __str__(self):
+        return self.name
 
     def draw_influence_from_deck(self, deck):
         self._owned_influence.append(deck.draw())
@@ -77,31 +84,66 @@ class CoupGamePlayer(object):
         return self._owned_influence
 
 class CoupGame(object):
-    def __init__(self):
+    def __init__(self, name):
+        self.channel_layer = get_channel_layer()
+        self.name = name
         self.deck = None
         self.players = list()
         self.turn_player = None
         self.game_state = None
+
+    async def ping(self):
+        await self.broadcast_message_to_room(header='chat-message', message='CoupGame ping')
     
     def get_num_players(self):
         return len(self.players)
     
+    def get_player_names(self):
+        return [pl.name for pl in self.players]
+    
     def add_player(self, player_name):
         self.players.append(CoupGamePlayer(player_name))
     
-    def start_game(self):
+    async def start_game(self):
         self.deck = CourtDeck()
         self.deck.shuffle()
         for player in self.players:
             player.draw_influence_from_deck(self.deck)
             player.draw_influence_from_deck(self.deck)
         self.turn_player = self.players[0]
-        self.do_turn()
+        self.game_state = 'turn_action'
+
+        # TODO: Change valid number of players to 2
+        if self.get_num_players() == 0:
+            logging.error("Game engine try to start game but there are no players in the game")
+            await self.broadcast_message_to_room(header='chat-message', message='Error: Not enough player.')
+            return
+        await self.broadcast_message_to_room(header='chat-message', message='Game Start')
+        await self.broadcast_game_state()
     
-    def do_turn(self):
+    async def update_game_state(self, event):
+        await broadcast_game_state()
         pass
+    
+    async def broadcast_game_state(self):
+        """This function should update player of the current game state"""
+        await self.broadcast_message_to_room(header='chat-message', message=self.turn_player.name + '\'s turn')
+        message = dict()
+        if self.game_state is 'turn_action':
+            for player in self.players:
+                if player == self.turn_player:
+                    message[player.name] = {
+                        'header':'player-valid-moves',
+                        'message':[action.value for action in Actions]
+                    }
+                else:
+                    message[player.name] = {
+                        'header':'player-valid-moves',
+                        'message':[]
+                    }
+        await self.broadcast_game_state_message_to_room(message)
+           
         '''
-        self.get_turn_action(self.turn_player)
         opponents = [pl for pl in self.players if not pl == self.turn_player]
         action = self.query_action_from_player(self.turn_player)
         challenger = self.query_challenge_from_player_list(opponents)
@@ -120,3 +162,22 @@ class CoupGame(object):
             if not loser == counter_player:
                 self.update_game_state(counter_player, counteraction)
         '''
+
+    async def broadcast_game_state_message_to_room(self, message):
+        logging.info(f'CoupGame {self.name} broadcasting {message}')
+        await self.channel_layer.group_send(
+            self.name, {
+                'type': 'game_state_update',
+                'message': message
+            }
+        )
+    
+    async def broadcast_message_to_room(self, header, message):
+        logging.info(f'CoupGame {self.name} broadcasting {header}: {message}')
+        await self.channel_layer.group_send(
+            self.name, {
+                'type': 'game_message',
+                'header': header,
+                'message': message
+            }
+        )

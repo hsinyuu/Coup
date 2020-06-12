@@ -33,20 +33,20 @@ Room
     <div class='row'>
         <div class='col-12 border' style='height:40px'>
         Actions
-        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-income'>Income</Button>
-        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-foreign-aid'>Foreign Aid</Button>
-        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-tax'>Tax (Duke)</Button>
-        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-steal'>Steal (Captain)</Button>
-        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-assassinate'>Assassinate (Assassin)</Button>
-        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-exchange'>Exchange (Ambassador)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='income'>Income</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='foreign-aid'>Foreign Aid</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='tax'>Tax (Duke)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='steal'>Steal (Captain)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='assassinate'>Assassinate (Assassin)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='exchange'>Exchange (Ambassador)</Button>
         </div>
     </div>
     <div class='row'>
         <div class='col-12 border' style='height:40px'>
         Counteractions
-        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='counteraction-block-foreign-aid'>Block Foreign Aid (Duke)</Button>
-        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='counteraction-block-steal'>Block Steal (Captain/Ambassador)</Button>
-        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='counteraction-block-assassinate'>Block Assasinate (Contessa)</Button>
+        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='block-foreign-aid'>Block Foreign Aid (Duke)</Button>
+        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='block-steal'>Block Steal (Captain/Ambassador)</Button>
+        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='block-assassinate'>Block Assasinate (Contessa)</Button>
         </div>
     </div>
     <div class='row'>
@@ -59,15 +59,15 @@ Room
 
 <script>
     const gameplayButtons = [
-        'action-income', 
-        'action-foreign-aid', 
-        'action-tax', 
-        'action-steal', 
-        'action-assassinate', 
-        'action-exchange',
-        'counteraction-block-foreign-aid', 
-        'counteraction-block-steal', 
-        'counteraction-block-assassinate',
+        'income', 
+        'foreign-aid', 
+        'tax', 
+        'steal', 
+        'assassinate', 
+        'exchange',
+        'block-foreign-aid', 
+        'block-steal', 
+        'block-assassinate',
         'challenge',
         'start-game'
     ]
