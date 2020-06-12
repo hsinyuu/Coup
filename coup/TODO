@@ -1,0 +1,133 @@
+Requirements:
+- Support room creation
+- Room chat
+- Ping player to check if connection is alive
+- Game related:
+    - Receive player's action
+    - Verify player action (Cheat detection)
+    - Update and broadcast game state
+    - Control turns
+
+Definitions:
+Message classes:
+    - chat-msg              # Clients to clients chat messages
+    - game-msg              # From server to clients
+    - game-actions          # Action from clients
+    - game-counteractions   # Counteractions from clients to targeting client
+    - game-challenge        # Challenge from clients to other clients
+TODO: Add namedtuple for internal messages
+TODO: Add namedtuple for external messages
+
+Frontend:
+// These are the fundamental prototype functionality I should have in order to demo the game
+- Lobby
+    [ ] List of rooms
+    [ ] Create room
+    [ ] Join room
+    [ ] Delete room if master
+    [ ] Assign random username
+- Room
+    [ ] Player name
+    [X] Send player moves
+    [X] Chatbox
+    [X] Input chat
+    [X] Players in the room
+    [X] Buttons for actions/counteractions/challenge
+
+Backend:
+[ ] Logging suppoert
+[ ] PlayerConsumer
+    [ ] Update game state
+    [ ] Send game state
+    [ ] Send GameMessage
+    [X] Send message type (by player, game msg, etc.)
+    [X] Receive ChatMessage
+    [X] Receive Actions
+    [X] Send ChatMessage
+[ ] GameEngineConsumer
+    [ ] Create a new coup game with respect to room
+    [ ] Receive Actions
+    [ ] Each turn, we send current state of the game
+    [ ] Keep multiple games in cache; probably in a form of dict
+    [X] Setup worker
+[ ] CoupGame
+    [ ] Action/counteraction/influence definitions
+    [ ] Decide on datastructure
+
+
+##Messages
+Server to client message structure
+{
+    'header': 'player-list',
+    'message': [player0, plyaer1]
+}
+{
+    'header': 'chat-message',
+    'message':'new chat message'
+}
+{
+    'header':' 'player-valid-moves',
+    'message': ['action-income', 'action-foreign-aid', ...]
+}
+}                                                                   
+
+Client to server message structure
+There are three types of headers:
+    - chat-message  : chat message to the group
+    - game-control  : utilities in the game such as start or pause
+    - game-move     : actual gameplay
+{
+    'header': 'chat-message',
+    'message': 'hello guys'
+}
+{
+    'header': 'game-control',
+    'message': 'start-game'
+}
+{
+    'header': 'game-control',
+    'message': 'exit'
+}
+{
+    'header': 'game-control',
+    'message': 'pause'
+}
+{
+    'header': 'game-move',
+    'message': {
+        'type': 'action',
+        'move': 'income',
+        'target': null
+    }
+}
+{
+    'header': 'game-move',
+    'message': {
+        'type': 'action',
+        'move': 'assassinate',
+        'target': 'player2'
+    }
+}
+{
+    'header': 'game-move',
+    'message': {
+        'type': 'counteraction',
+        'move': 'block-foreign-aid',
+        'target': null
+    }
+}
+{
+    'header': 'game-move',
+    'message': {
+        'type': 'challenge',
+        'move': 'challenge',
+        'target': null
+    }
+}
+
+Server internal
+GameEngineConsumer:
+    def player_move_event():
+        # Receives player move and return sanitized type for the entity
+    def player_control_event():
+        # Receives player control and broadcast the required updates to the players in the room

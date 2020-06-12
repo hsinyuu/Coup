@@ -1,0 +1,36 @@
+{% extends 'game/base.html' %}
+{% block content %}
+<!--
+    - Lobby
+    - List of rooms
+    - Create room
+    - Join room
+    - Delete room if master
+    - Assign random username
+-->
+
+
+<div class='container py-3'>
+<div class='row' id='room-list'>
+</div>
+</div>
+
+<script>
+
+const getFormatedRoom = (roomName) => {
+    return "<div class='border rounded col-12 mx-auto py-2'>" 
+            + roomName
+            + "<Button class='btn btn-primary btn-sm'>Join</Button>"
+            + "<Button class='btn btn-danger btn-sm'>Remove</Button>"
+            + "</div>"
+}
+
+const roomListElement = document.getElementById('room-list')
+roomListElement.innerHTML = getFormatedRoom('test')
+
+
+</script>
+
+
+
+{% endblock content %}

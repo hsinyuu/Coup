@@ -1,0 +1,176 @@
+{% extends 'game/base.html' %}
+{% block content %}
+<!--
+Room
+- Chatbox
+- Input chat
+- Players in the room
+- Start game
+- Buttons for actions/counteractions/challenge
+-->
+
+<div class='container py-5'>
+    <div class='row'>
+        <h1 id='room-name'>{{room_name}}</h1>
+    </div>
+    <div class='row'>
+        <div class='col-8 border' style='height:400px'>
+            <div readonly id='message-log' style='height:100%;width:100%;border:none;overflow-y:scroll'></div>
+        </div>
+        <div class='col-4 border' style='height:400px'>
+            <ul class="list-group" id='player-list'> </ul>
+        </div>
+    </div>
+    <div class='row'>
+        <div class='col-8 border' style='height:35px'>
+            <input id="message-input" type="text" style='height:100%;width:100%'><br>
+        </div>
+        <div class='col-4 border' style='height:35px'>
+            <Button id='message-submit' class='btn btn-primary btn-sm'>Send</Button>
+            <Button id='start-game' class='btn btn-primary btn-sm'>Start Game</Button>
+        </div>
+    </div>
+    <div class='row'>
+        <div class='col-12 border' style='height:40px'>
+        Actions
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-income'>Income</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-foreign-aid'>Foreign Aid</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-tax'>Tax (Duke)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-steal'>Steal (Captain)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-assassinate'>Assassinate (Assassin)</Button>
+        <Button onclick="sendAction(this)" class='btn btn-warning btn-sm' id='action-exchange'>Exchange (Ambassador)</Button>
+        </div>
+    </div>
+    <div class='row'>
+        <div class='col-12 border' style='height:40px'>
+        Counteractions
+        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='counteraction-block-foreign-aid'>Block Foreign Aid (Duke)</Button>
+        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='counteraction-block-steal'>Block Steal (Captain/Ambassador)</Button>
+        <Button onclick="sendCounter(this)" class='btn btn-warning btn-sm' id='counteraction-block-assassinate'>Block Assasinate (Contessa)</Button>
+        </div>
+    </div>
+    <div class='row'>
+        <div class='col-12 border' style='height:40px'>
+        Challenge
+            <Button onclick="sendChallenge(this)" class='btn btn-warning btn-sm' id='challenge'>Challenge</Button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const gameplayButtons = [
+        'action-income', 
+        'action-foreign-aid', 
+        'action-tax', 
+        'action-steal', 
+        'action-assassinate', 
+        'action-exchange',
+        'counteraction-block-foreign-aid', 
+        'counteraction-block-steal', 
+        'counteraction-block-assassinate',
+        'challenge',
+        'start-game'
+    ]
+
+    const sendAction = (elem) => {
+        sendMessageToSocket('game-actions', elem.id)
+    }
+
+    const sendCounter = (elem) => {
+        sendMessageToSocket('game-counteractions', elem.id)
+    }
+
+    const sendChallenge = (elem) => {
+        sendMessageToSocket('game-challenge', elem.id)
+    }
+
+    const roomName = document.getElementById('room-name').textContent;
+
+    const gameSocket = new WebSocket(
+        'ws://'
+        + window.location.host
+        + '/ws/message/'
+        + roomName
+        + '/'
+    );
+
+    gameSocket.onmessage = function(e) {
+        console.log('Received message ' + e.data);
+        const data = JSON.parse(e.data);
+        switch (data.header) {
+            case 'chat-message':
+                const newChatMessage = data.message
+                addMessageToChatLog(newChatMessage);
+                console.log('Updated chat log: ' + newChatMessage)
+                break;
+            case 'player-list':
+                const newPlayerList = data.message
+                reloadPlayerList(newPlayerList);
+                console.log('Updated player list:')
+                console.table(newPlayerList)
+                break;
+            case 'player-valid-moves':
+                const validPlayerMoves = data.message
+                setButtonDisableProp(gameplayButtons, true);
+                setButtonDisableProp(validPlayerMoves, false);
+                console.log('Enabled buttons: ' + validPlayerMoves)
+                break;
+            default:
+                alert('unknown data message ' + e.data)
+        }
+    };
+
+    gameSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    document.querySelector('#message-input').focus();
+    document.querySelector('#message-input').onkeyup = function(e) {
+        if (e.keyCode === 13) {  // enter, return
+            document.querySelector('#message-submit').click();
+        }
+    };
+
+    document.querySelector('#message-submit').onclick = function(e) {
+        const messageInputElem = document.querySelector('#message-input');
+        const message = messageInputElem.value;
+        sendMessageToSocket('chat-message', message);
+        messageInputElem.value = '';
+    };
+
+    document.querySelector('#start-game').onclick = function(e) {
+        sendMessageToSocket('start-game', '');
+    };
+
+    const sendMessageToSocket = (header, message) => {
+        gameSocket.send(JSON.stringify({
+            'header': header,
+            'message': message
+        }));
+    }
+
+    const addMessageToChatLog = (message) => {
+        document.querySelector('#message-log').innerHTML += '<div>' + message + '</div>';
+    }
+
+    const reloadPlayerList = (playerList) => {
+        const playerListElem = document.querySelector('#player-list');
+        playerListElem.innerHTML = "" // Reset player list
+        playerList.forEach((item,idx) => {
+            playerListElem.innerHTML += "<li class=\"list-group-item\">" + item + "</li>"
+        });
+    }
+
+    const setButtonDisableProp = (buttonIdArray, disableFlag) => {
+        if (buttonIdArray.length == 0)
+            return;
+        buttonIdArray.forEach( 
+            (buttonId) => {
+                $('#'+buttonId).prop('disabled', disableFlag);
+            }
+        )
+    }
+
+</script>
+
+{% endblock content %}
