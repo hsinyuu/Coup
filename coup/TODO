@@ -27,7 +27,9 @@ Frontend:
     [ ] Delete room if master
     [ ] Assign random username
 - Room
-    [ ] Player name
+    [X] Show player influence
+    [X] Show player status (observer or player)
+    [X] Player name
     [X] Send player moves
     [X] Chatbox
     [X] Input chat
@@ -35,11 +37,11 @@ Frontend:
     [X] Buttons for actions/counteractions/challenge
 
 Backend:
-[ ] Logging suppoert
+[ ] Define exceptions
+[ ] Proper logging suppoert
 [ ] PlayerConsumer
-    [ ] Update game state
-    [ ] Send game state
-    [ ] Send GameMessage
+    [X] Update game state
+    [X] Send GameMessage
     [X] Send message type (by player, game msg, etc.)
     [X] Receive ChatMessage
     [X] Receive Actions
@@ -51,15 +53,38 @@ Backend:
     [ ] Keep multiple games in cache; probably in a form of dict
     [X] Setup worker
 [ ] CoupGame
-    [ ] Action/counteraction/influence definitions
-    [ ] Decide on datastructure
+    [ ] Game logic
+        [ ] Coins increment
+        [ ] Coup kill
+        [ ] Assassin kill
+        [ ] Ambassador exchange
+        [ ] Influence logic at challenge (lose or exchange)
+        [ ] Move player to observer once both influences are dead
+    [X] Player status update (influence, coin and alive/dead)
+    [X] Send game state
+    [X] Action/counteraction/influence definitions
+    [X] Decide on datastructure
 
 
 ##Messages
 Server to client message structure
 {
-    'header': 'player-list',
-    'message': [player0, plyaer1]
+    'header': 'player-states',
+    'message': [
+        {
+            'player-name': 'player0',
+            'playing': true,
+            'influence': ['Duke', 'Assassin']
+            'coin': 0
+        },
+        {
+            'player-name': 'player1',
+            'playing': true,
+            'influence': ['*', '*']
+            'coin': 0
+
+        }
+    ]
 }
 {
     'header': 'chat-message',
