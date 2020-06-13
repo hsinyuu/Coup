@@ -1,4 +1,5 @@
 import logging
+import copy
 import enum
 from random import shuffle
 from channels.layers import get_channel_layer
@@ -88,29 +89,45 @@ class CoupGamePlayer(object):
     def __init__(self, name):
         self.name = name
         self.coins = 0
-        self._owned_influence = list()  # Cards faced down
-        self._lost_influence = list()   # Cards revealed
+        self.owned_influence = list()  # Cards faced down
+        self.lost_influence = list()   # Cards revealed
     
     def __str__(self):
         return self.name
-
+    
     def draw_influence_from_deck(self, deck):
-        self._owned_influence.append(deck.draw())
+        self.owned_influence.append(deck.draw())
 
     def exchange_card(self, influence_to_exchange, influence_to_return, deck):
-        assert influence_to_exchange in self._owned_influence, f"Player does not own {influence}"
-        self._owned_influence.remove(influence_to_return)
-        self._owned_influence.append(influence_to_exchange)
+        assert influence_to_exchange in self.owned_influence, f"Player does not own {influence}"
+        self.owned_influence.remove(influence_to_return)
+        self.owned_influence.append(influence_to_exchange)
         deck.put_back_and_reshuffle(influence_to_return)
     
     def lose_influence(self, influence):
-        assert influence in self._owned_influence, f"Player does not own {influence}"
-        self._owned_influence.remove(influence)
-        self._lost_influence.append(influence)
+        assert influence in self.owned_influence, f"Player does not own {influence}"
+        self.owned_influence.remove(influence)
+        self.lost_influence.append(influence)
     
-    def still_alive(self):
-        return self._owned_influence
-
+    def get_influence_in_opponent_perspective(self):
+        """Return list of influence in string in the perspective of opponents."""
+        # Opponents should only see influence that were lost by the player,
+        # we use '*' string to denote folded influence.
+        viewed_influence = ['*']*len(self.owned_influence)
+        viewed_influence.extend([inf.value for inf in self.lost_influence])
+        return viewed_influence
+    
+    def get_influence_in_player_perspective(self):
+        """Return list of influence in string in the perspective of the owner."""
+        viewed_influence = [inf.value for inf in self.owned_influence]
+        viewed_influence.extend([inf.value for inf in self.lost_influence])
+        return viewed_influence
+    
+    def is_in_game(self):
+        if self.owned_influence:
+            return True
+        return False
+    
 class CoupGame(object):
     def __init__(self, name):
         self.channel_layer = get_channel_layer()
@@ -121,12 +138,12 @@ class CoupGame(object):
         self.game_state = None
         self._turn_player_index = None
 
-    async def ping(self):
-        await self.broadcast_message_to_room(header='chat-message', message='CoupGame ping')
-    
     @property
     def turn_player(self):
         return self.players[self._turn_player_index]
+
+    async def ping(self):
+        await self.broadcast_message_to_room(header='chat-message', message='CoupGame ping')
 
     def next_turn(self):
         """Update turn player to the next player in order"""
@@ -224,18 +241,18 @@ class CoupGame(object):
             logging.error(f"Unexpected move type {move_type}")
     
     async def broadcast_game_state(self):
-        """This function should update player of the current game state"""
-        player_state = dict()
+        """This function should update client of the current game state"""
+        player_moves_msg = dict()
         if self.game_state['wait'] == 'action':
             await self.broadcast_message_to_room(header='chat-message', message=self.turn_player.name + '\'s turn')
             for player in self.players:
                 if player == self.turn_player:
-                    player_state[player.name] = {
+                    player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':[action.value for action in Actions]
                     }
                 else:
-                    player_state[player.name] = {
+                    player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':[]
                     }
@@ -248,39 +265,85 @@ class CoupGame(object):
             
             for player in self.players:
                 if player == self.turn_player:
-                    player_state[player.name] = {
+                    player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':[]
                     }
                 else:
-                    player_state[player.name] = {
+                    player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':counters_and_challenge
                     }
         elif self.game_state['wait'] == 'challenge_counter':
             for player in self.players:
                 if player == self.turn_player:
-                    player_state[player.name] = {
+                    player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':[Challenge.CHALLENGE.value]
                     }
                 else:
-                    player_state[player.name] = {
+                    player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':[]
                     }
         
-        if not player_state:
+        if not player_moves_msg:
             logging.error("Player state undefined")
 
-        logging.info(f'CoupGame {self.name} broadcasting game_state {player_state}')
+        logging.info(f'CoupGame {self.name} broadcasting game_state {player_moves_msg}')
         await self.channel_layer.group_send(
             self.name, {
                 'type': 'game_state_update',
-                'message': player_state
+                'message': player_moves_msg
             }
         )
     
+    async def broadcast_player_state(self):
+        """Broadcast player state message in dict form, where 
+        each item is addressed to each player."""
+        # Each player-state message should contain:
+        #   - name   : name of the player or user
+        #   - playing       : true/false if the player is playing or is observer
+        #   - influence     : current influence in holding
+        #   - coin          : current coin number
+        #   - is_self       : is client
+
+        player_states = list()
+        for player in self.players:
+            player_states.append(
+                {
+                    'name': player.name,
+                    'playing': player.is_in_game(),
+                    'influence': player.get_influence_in_opponent_perspective(),
+                    'coin': player.coins,
+                    'is_self': False
+                }
+            )
+        
+        player_states_msg = dict()
+        for player in self.players:
+            # In the above loop, we represented all influences in opponent's perspective.
+            # Here, we replace the owned influence to player's perspective. 
+            states_viewed_by_player = copy.deepcopy(player_states)
+            # TODO: optimize this O(N) replace
+            for state in states_viewed_by_player:
+                if state['name'] == player.name:
+                    state['influence'] = player.get_influence_in_player_perspective()
+                    state['is_self'] = True
+            player_states_msg[player.name] = {
+                'header': 'player-state-list',
+                'message': states_viewed_by_player 
+            }
+
+        logging.info(f'CoupGame {self.name} broadcasting player state {player_states_msg}')
+        await self.channel_layer.group_send(
+            self.name, {
+                'type': 'game_state_update',
+                'message': player_states_msg
+            }
+        )
+    
+    # Helper function for broadcasting generic message
     async def broadcast_message_to_room(self, header, message):
         logging.info(f'CoupGame {self.name} broadcasting {header}: {message}')
         await self.channel_layer.group_send(

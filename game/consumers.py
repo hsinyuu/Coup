@@ -81,7 +81,6 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         game_state_message = event.get('message')
         if self.player_name not in game_state_message:
             logging.error(f"Missing player {self.player_name} in game state update {event}")
-            import pdb; pdb.set_trace()
             return
         player_game_state_message = game_state_message.get(self.player_name)
         logging.debug(f"Sending game state {player_game_state_message}")
@@ -146,6 +145,7 @@ class GameEngineConsumer(AsyncConsumer):
         room_game = self.games[room_name]
         await room_game.start_game()
         await room_game.broadcast_game_state()
+        await room_game.broadcast_player_state()
 
     async def join_game(self, event):
         logging.info(f"Received message {event}")

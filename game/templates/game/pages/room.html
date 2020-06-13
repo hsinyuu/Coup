@@ -104,7 +104,7 @@ Room
                 break;
             case 'player-list':
                 const newPlayerList = data.message
-                reloadPlayerList(newPlayerList);
+                updatePlayerList(newPlayerList);
                 console.log('Updated player list:')
                 console.table(newPlayerList)
                 break;
@@ -114,6 +114,11 @@ Room
                 setButtonDisableProp(validPlayerMoves, false);
                 console.log('Enabled buttons: ' + validPlayerMoves)
                 break;
+            case 'player-state-list':
+                const playerStates = data.message
+                console.table(playerStates)
+                updatePlayerListWithState(playerStates)
+                break
             default:
                 alert('unknown data message ' + e.data)
         }
@@ -152,7 +157,26 @@ Room
         document.querySelector('#message-log').innerHTML += '<div>' + message + '</div>';
     }
 
-    const reloadPlayerList = (playerList) => {
+    const updatePlayerListWithState = (playerStateList) => {
+        const playerListElem = document.querySelector('#player-list');
+        playerListElem.innerHTML = "" // Reset player list
+        playerStateList.forEach((playerState,idx) => {
+            const formattedPlayerState = playerState.name + ": "
+                                        + playerState.coin 
+                                        + " [" 
+                                        + playerState.influence[0] + ", " 
+                                        + playerState.influence[1] + "]"
+            if (!playerState.playing)
+                formattedPlayerState += " (Observer)"
+
+            if (playerState.is_self)
+                playerListElem.innerHTML += "<li class=\"list-group-item list-group-item-warning\">" + formattedPlayerState + "</li>"
+            else
+                playerListElem.innerHTML += "<li class=\"list-group-item\">" + formattedPlayerState + "</li>"
+        });
+    }
+
+    const updatePlayerList = (playerList) => {
         const playerListElem = document.querySelector('#player-list');
         playerListElem.innerHTML = "" // Reset player list
         playerList.forEach((item,idx) => {
