@@ -54,8 +54,8 @@ class PlayerConsumer(AsyncWebsocketConsumer):
 
         if header == 'chat-message':
             await self.broadcast_message_to_room(message)
-        elif header in ('game-actions', 'game-counteractions', 'game-challenge'):
-            pass
+        elif header == 'game-move':
+            await self.send_message_to_game_engine(handler='game_move', message=message)
         elif header == 'start-game':
             await self.send_message_to_game_engine(handler='start_game', message=None)
         else:
@@ -77,22 +77,11 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         await self.send_message_to_client(header=event.get('header'), message=event.get('message'))
 
     async def game_state_update(self, event):
-        """Update interface of the client (valid buttons etc.)
-        {
-            player0: {
-                'player-valid-moves': [
-                    'challenge',
-                ]
-            }
-            player1: {
-                'player-valid-moves': [
-                ]
-            }
-        }
-        """
+        """Update interface of the client (valid buttons etc.)"""
         game_state_message = event.get('message')
         if self.player_name not in game_state_message:
-            logging.error(f"Missing player {self.player_name}in game state update {game_state_message}")
+            logging.error(f"Missing player {self.player_name} in game state update {event}")
+            import pdb; pdb.set_trace()
             return
         player_game_state_message = game_state_message.get(self.player_name)
         logging.debug(f"Sending game state {player_game_state_message}")
@@ -138,12 +127,25 @@ class GameEngineConsumer(AsyncConsumer):
         self.name = 'game-engine'
         self.channel_layer = get_channel_layer()
         self.games = dict()
+
+    async def game_move(self, event):
+        message = event.get('message')
+        room_name = event.get('room_group_name')
+        room_game = self.games[room_name]
+
+        await room_game.update_game_state_with_move(
+            move_type=message.get('type'),
+            move=message.get('move'),
+            target=message.get('target')
+        )
+        await room_game.broadcast_game_state()
     
     async def start_game(self, event):
         logging.info(f"Received message {event}")
         room_name = event.get('room_group_name')
         room_game = self.games[room_name]
         await room_game.start_game()
+        await room_game.broadcast_game_state()
 
     async def join_game(self, event):
         logging.info(f"Received message {event}")
