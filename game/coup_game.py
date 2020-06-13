@@ -10,17 +10,42 @@ class Actions(enum.Enum):
     FOREIGN_AID = 'foreign-aid'
     COUP = 'coup'
     TAX = 'tax'
-    ASSASINATE = 'assassinate'
+    ASSASSINATE = 'assassinate'
     STEAL = 'steal'
     EXCHANGE = 'exchange'
+
+    @classmethod
+    def from_str(cls, string_key):
+        return cls[string_key.replace('-','_').upper()]
 
 class Counteractions(enum.Enum):
     BLOCK_FOREIGN_AID = 'block-foreign-aid'
     BLOCK_ASSASSINATION = 'block-assassination'
-    BLOCK_STEALING = 'block-steal'
+    BLOCK_STEAL = 'block-steal'
+
+    @classmethod
+    def from_str(cls, string_key):
+        return cls[string_key.replace('-','_').upper()]
+
+    @classmethod
+    def get_counter_from_action(cls, action):
+        assert isinstance(action, Actions), type(action)
+        if action is Actions.FOREIGN_AID:
+            return cls.BLOCK_FOREIGN_AID
+        elif action is Actions.ASSASSINATE:
+            return cls.BLOCK_ASSASSINATION
+        elif action is Actions.STEAL:
+            return cls.BLOCK_STEAL
+        else:
+            # Action has no counter
+            return None
 
 class Challenge(enum.Enum):
     CHALLENGE = 'challenge'
+
+    @classmethod
+    def from_str(cls, string_key):
+        return cls[string_key.upper()]
 
 class Influence(enum.Enum):
     DUKE = 'duke'
@@ -153,12 +178,22 @@ class CoupGame(object):
             if self.game_state['action_played']:
                 logging.error(f"Duplicate action attempt {self.game_state['action']}, attempted {move}")
                 return
-            self.game_state['action_played'] = move
+            if move == Actions.INCOME.value:
+                self.next_turn()
+                self.game_state = {
+                    'turn': self.turn_player,
+                    'wait': 'action',
+                    'action_played': None,
+                    'action_target': None,
+                    'counter_played': None
+                }
+                return
+            self.game_state['action_played'] = Actions.from_str(move)
             self.game_state['wait'] = 'counter_or_challenge'
         elif self.game_state['wait'] == 'counter_or_challenge':
             if move_type == 'counter':
                 # TODO: validate counter vs action
-                self.game_state['counter_played'] = move
+                self.game_state['counter_played'] = Counteractions.from_str(move)
                 self.game_state['wait'] = 'challenge_counter'
             elif move_type == 'challenge':
                 # TODO: resolve challenge, find loser of challenge and lose influence
@@ -205,8 +240,12 @@ class CoupGame(object):
                         'message':[]
                     }
         elif self.game_state['wait'] == 'counter_or_challenge':
-            counters_and_challenge = [counter.value for counter in Counteractions]
-            counters_and_challenge.append(Challenge.CHALLENGE.value)
+            assert self.game_state['action_played']
+            counters_and_challenge = [Challenge.CHALLENGE.value]
+            counter = Counteractions.get_counter_from_action(self.game_state['action_played'])
+            if counter:
+                counters_and_challenge.append(counter.value)
+            
             for player in self.players:
                 if player == self.turn_player:
                     player_state[player.name] = {
