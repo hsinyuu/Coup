@@ -54,12 +54,12 @@ Backend:
     [X] Setup worker
 [ ] CoupGame
     [ ] Game logic
-        [ ] Coins increment
+        [ ] Coins increment <--
         [ ] Coup kill
         [ ] Assassin kill
         [ ] Ambassador exchange
-        [ ] Influence logic at challenge (lose or exchange)
-        [ ] Move player to observer once both influences are dead
+        [X] Influence logic at challenge (lose or exchange)
+        [X] Move player to observer once both influences are dead
     [X] Player status update (influence, coin and alive/dead)
     [X] Send game state
     [X] Action/counteraction/influence definitions

@@ -31,6 +31,10 @@ Room
         </div>
     </div>
     <div class='row'>
+        <div class='col-12 border' style='height:40px' id='player-influence' hidden>
+        </div>
+    </div>
+    <div class='row'>
         <div class='col-12 border' style='height:40px'>
         Actions
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='income'>Income</Button>
@@ -58,6 +62,9 @@ Room
 </div>
 
 <script>
+    /*********************************/
+    /*       Global variables        */
+    /*********************************/
     const gameplayButtons = [
         'income', 
         'foreign-aid', 
@@ -71,17 +78,6 @@ Room
         'challenge',
         'start-game'
     ]
-    const sendPlayerMove = (elem, move_type) => {
-        console.log('Send move' + elem.id, move_type)
-        sendMessageToSocket('game-move', 
-            {
-                'type': move_type,
-                'move': elem.id,
-                'target': null
-
-            }
-        )
-    }
 
     const roomName = document.getElementById('room-name').textContent;
 
@@ -93,32 +89,42 @@ Room
         + '/'
     );
 
+    /*********************************/
+    /*       Socket Handlers         */
+    /*********************************/
     gameSocket.onmessage = function(e) {
         console.log('Received message ' + e.data);
         const data = JSON.parse(e.data);
         switch (data.header) {
             case 'chat-message':
-                const newChatMessage = data.message
+                const newChatMessage = data.message;
                 addMessageToChatLog(newChatMessage);
-                console.log('Updated chat log: ' + newChatMessage)
+                console.log('GameSocket onmessage: Updated chat log: ' + newChatMessage);
                 break;
             case 'player-list':
-                const newPlayerList = data.message
+                const newPlayerList = data.message;
                 updatePlayerList(newPlayerList);
-                console.log('Updated player list:')
-                console.table(newPlayerList)
+                console.log('GameSocket onmessage: Updated player list:');
+                console.table(newPlayerList);
                 break;
             case 'player-valid-moves':
-                const validPlayerMoves = data.message
-                setButtonDisableProp(gameplayButtons, true);
-                setButtonDisableProp(validPlayerMoves, false);
-                console.log('Enabled buttons: ' + validPlayerMoves)
+                const validPlayerMoves = data.message;
+                disableButtonArray(gameplayButtons);
+                enableButtonArray(validPlayerMoves);
+                console.log('GameSocket onmessage: Enabled buttons: ' + validPlayerMoves);
                 break;
             case 'player-state-list':
-                const playerStates = data.message
-                console.table(playerStates)
-                updatePlayerListWithState(playerStates)
-                break
+                const playerStates = data.message;
+                updatePlayerListWithState(playerStates);
+                console.log('GameSocket onmessage: Updated player-list')
+                console.table(playerStates);
+                break;
+            case 'player-influence-query':
+                const influenceList = data.message;
+                showInfluenceButtons(influenceList);
+                console.log('GameSocket onmessage: Query influence');
+                console.table(influenceList);
+                break;
             default:
                 alert('unknown data message ' + e.data)
         }
@@ -146,34 +152,65 @@ Room
         sendMessageToSocket('start-game', '');
     };
 
+    /*********************************/
+    /* Handlers and helper functions */
+    /*********************************/
+    const sendPlayerMove = (elem, move_type) => {
+        console.log('Send move: ' + elem.id + ', type: ' + move_type);
+        sendMessageToSocket('game-move', 
+            {
+                'type': move_type,
+                'move': elem.id,
+                'target': null
+
+            }
+        )
+        disableButtonArray(gameplayButtons);
+    };
+
+    // Wrapper for sendPlayerMove(...). Hide influence selection buttons after click
+    const sendPlayerInfluenceSelect = (elem, move_type) => {
+        $('#player-influence').prop('hidden', true);
+        sendPlayerMove(elem, move_type)
+    };
+
+
     const sendMessageToSocket = (header, message) => {
         gameSocket.send(JSON.stringify({
             'header': header,
             'message': message
         }));
-    }
+    };
 
     const addMessageToChatLog = (message) => {
         document.querySelector('#message-log').innerHTML += '<div>' + message + '</div>';
-    }
+    };
 
     const updatePlayerListWithState = (playerStateList) => {
         const playerListElem = document.querySelector('#player-list');
         playerListElem.innerHTML = "" // Reset player list
         playerStateList.forEach((playerState,idx) => {
-            const formattedPlayerState = playerState.name + ": "
-                                        + playerState.coin 
-                                        + " [" 
-                                        + playerState.influence[0] + ", " 
-                                        + playerState.influence[1] + "]"
+            let formattedPlayerState = playerState.name + ": <span class=\"badge badge-warning\">" + playerState.coin + "</span>";
+            formattedPlayerState += generateFormattedInfluenceBadge(playerState.influence[0].card, playerState.influence[0].state);
+            formattedPlayerState += generateFormattedInfluenceBadge(playerState.influence[1].card, playerState.influence[1].state);
             if (!playerState.playing)
-                formattedPlayerState += " (Observer)"
+                formattedPlayerState += " (Observer)";
 
-            if (playerState.is_self)
+            if (playerState.is_self) {
                 playerListElem.innerHTML += "<li class=\"list-group-item list-group-item-warning\">" + formattedPlayerState + "</li>"
-            else
+            }
+            else {
                 playerListElem.innerHTML += "<li class=\"list-group-item\">" + formattedPlayerState + "</li>"
+            }
         });
+    };
+
+    const generateFormattedInfluenceBadge = (influenceName, state) => {
+        if (state === "revealed")
+            return "<span class=\"badge badge-danger\">" + influenceName + "</span>"
+        if (state === "folded")
+            return "<span class=\"badge badge-success\">" + influenceName + "</span>"
+        return "Error"
     }
 
     const updatePlayerList = (playerList) => {
@@ -182,7 +219,35 @@ Room
         playerList.forEach((item,idx) => {
             playerListElem.innerHTML += "<li class=\"list-group-item\">" + item + "</li>"
         });
-    }
+    };
+
+    const generateFormattedInfluenceButton = (influenceName, state) => {
+        if (influenceName == null || state == null) 
+            return "Error!"
+        let buttonDOM = "<Button onclick=\"sendPlayerInfluenceSelect(this,'select-influence')\" class='btn btn-warning btn-sm'"
+        if (state === "revealed")
+            buttonDOM += ' disabled'
+        buttonDOM += " id='" + influenceName + "'>" + influenceName + "</Button>"
+        return buttonDOM
+        //return "<Button onclick=\"sendPlayerInfluenceSelect(this,'select-influence')\" class='btn btn-warning btn-sm' id='" + influence.card + "'>" + influence.card + "</Button>"
+    };
+
+    const showInfluenceButtons = (playerInfluenceList) => {
+        const playerInfluenceListElem = document.querySelector('#player-influence');
+        $('#player-influence').prop('hidden', false);
+        playerInfluenceListElem.innerHTML = 'Influence';
+        playerInfluenceList.forEach((item,idx) => {
+            playerInfluenceListElem.innerHTML += generateFormattedInfluenceButton(item.card, item.state);
+        });
+    };
+
+    const disableButtonArray = (buttonIdArray) => {
+        setButtonDisableProp(buttonIdArray, true);
+    };
+
+    const enableButtonArray = (buttonIdArray) => {
+        setButtonDisableProp(buttonIdArray, false);
+    };
 
     const setButtonDisableProp = (buttonIdArray, disableFlag) => {
         if (buttonIdArray.length == 0)
@@ -191,8 +256,8 @@ Room
             (buttonId) => {
                 $('#'+buttonId).prop('disabled', disableFlag);
             }
-        )
-    }
+        );
+    };
 
 </script>
 
