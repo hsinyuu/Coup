@@ -43,6 +43,8 @@ Room
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='steal'>Steal (Captain)</Button>
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='assassinate'>Assassinate (Assassin)</Button>
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='exchange'>Exchange (Ambassador)</Button>
+        <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='coup'>Coup</Button>
+        <Button onclick="sendPlayerMove(this,'pass')" class='btn btn-dark btn-sm' id='pass'>Pass</Button>
         </div>
     </div>
     <div class='row'>
@@ -72,11 +74,13 @@ Room
         'steal', 
         'assassinate', 
         'exchange',
+        'coup',
         'block-foreign-aid', 
         'block-steal', 
         'block-assassination',
         'challenge',
-        'start-game'
+        'start-game',
+        'pass'
     ]
 
     const roomName = document.getElementById('room-name').textContent;

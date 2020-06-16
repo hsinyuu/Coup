@@ -49,6 +49,13 @@ class Challenge(enum.Enum):
     def from_str(cls, string_key):
         return cls[string_key.upper()]
 
+class Pass(enum.Enum):
+    PASS = 'pass'
+
+    @classmethod
+    def from_str(cls, string_key):
+        return cls[string_key.upper()]
+
 class Influence(enum.Enum):
     DUKE = 'duke'
     CAPTAIN = 'captain'
@@ -131,6 +138,14 @@ class CoupGamePlayer(object):
         self.owned_influence.remove(influence)
         self.lost_influence.append(influence)
     
+    def get_doable_actions(self):
+        doable_actions = [Actions.INCOME, Actions.FOREIGN_AID, Actions.EXCHANGE, Actions.STEAL, Actions.TAX]
+        if self.coins >= 3:
+            doable_actions.append(Actions.ASSASSINATE)
+        if self.coins >= 7:
+            doable_actions.append(Actions.COUP)
+        return doable_actions
+    
     def get_influence_in_opponent_perspective(self):
         """Return list of influence in string in the perspective of opponents."""
         # Opponents should only see influence that were lost by the player,
@@ -177,8 +192,14 @@ class CoupGame(object):
             'wait': 'action',
             'action_played': None,
             'action_target': None,
-            'counter_played': None
+            'counter_played': None,
+            'counter_player': None,
+            'counter_failed': None,
+            'lose_influence_target': None,
+            'pass': list()
         }
+        logging.info([n.name for n in self.players])
+        logging.info(f'Turn {self._turn_player_index} : {self.turn_player.name}')
     
     def get_num_players(self):
         return len(self.players)
@@ -207,7 +228,9 @@ class CoupGame(object):
             'action_target': None,
             'counter_played': None,
             'counter_player': None,
-            'challenge_loser': None
+            'counter_failed': None,
+            'lose_influence_target': None,
+            'pass': list()
         }
 
         # TODO: Change valid number of players to 2
@@ -216,6 +239,35 @@ class CoupGame(object):
             await self.broadcast_message_to_room(header='chat-message', message='Error: Not enough player.')
             return
         await self.broadcast_message_to_room(header='chat-message', message='Game Start')
+    
+    def apply_action_and_next_turn(self, action, player, target=None):
+        """Modify state of players involved in an action and update the game state.
+        Note. that income action is not dealt here, since it always applies."""
+        assert isinstance(action, Actions), "Bad value for action"
+        assert isinstance(player, CoupGamePlayer), "Bad value for player"
+        if action is Actions.FOREIGN_AID:
+            player.coins += 2
+            self.next_turn()
+        elif action is Actions.TAX:
+            player.coins += 3
+            self.next_turn()
+        elif action is Actions.EXCHANGE:
+            raise NotImplementedError
+            pass
+        elif action is Actions.STEAL:
+            assert isinstance(target, CoupGamePlayer), "Bad value for target"
+            target.coins -= 2
+            player.coins += 2
+        elif action is Actions.ASSASSINATE:
+            assert isinstance(target, CoupGamePlayer), "Bad value for target"
+            player.coins -= 3
+            self.game_state['lose_influence_target'] = target
+            self.game_state['wait'] = 'lose_influence'
+        elif action is Actions.COUP:
+            assert isinstance(target, CoupGamePlayer), "Bad value for target"
+            player.coins -= 7
+            self.game_state['lose_influence_target'] = target
+            self.game_state['wait'] = 'lose_influence'
     
     async def update_game_state_with_move(self, player_name, move_type, move, target):
         """
@@ -245,13 +297,23 @@ class CoupGame(object):
             self.game_state['wait'] = 'counter_or_challenge'
 
         elif self.game_state['wait'] == 'counter_or_challenge':
-            # TODO: validate counter vs action
             if move_type == 'counter':
                 self.game_state['counter_played'] = Counteractions.from_str(move)
                 self.game_state['counter_player'] = self.name_to_player[player_name]
                 self.game_state['wait'] = 'challenge_counter'
+            elif move_type == 'pass':
+                if player_name == self.turn_player.name:
+                    logging.error('Error: Turn player shouldn\'t be allowed to send pass request')
+                    return
+                if player_name in self.game_state['pass']:
+                    logging.warning(f'{player_name} issued multiple \'pass\' request')
+                    return
+                self.game_state['pass'].append(player_name)
+                if len(self.game_state['pass']) == self.get_num_players()-1:
+                    # No challenges, action is effective
+                    self.apply_action_and_next_turn(self.game_state['action_played'], self.game_state['turn'], self.game_state['action_target'])
             elif move_type == 'challenge':
-                self.game_state['challenge_loser'] = self.get_loser_from_challenge(
+                self.game_state['lose_influence_target'] = self.get_loser_from_challenge(
                                                             self.turn_player, 
                                                             self.name_to_player[player_name], 
                                                             self.game_state['action_played']
@@ -259,24 +321,32 @@ class CoupGame(object):
                 self.game_state['wait'] = 'lose_influence'
 
         elif self.game_state['wait'] == 'challenge_counter':
-            if not move_type == 'challenge':
-                logging.error(f'Expected challenge: Player move {(move_type, move, target)}')
-                return
-            self.game_state['challenge_loser'] = self.get_loser_from_challenge(
-                                                        self.game_state['counter_player'], 
-                                                        self.turn_player, 
-                                                        self.game_state['counter_played']
-                                                    )
-            self.game_state['wait'] = 'lose_influence'
+            if move_type == 'pass':
+                if not player_name == self.turn_player.name:
+                    logging.error('Error: Opponent players shouldn\'t be allowed to send pass request')
+                # Action ineffective. We can directly go to the next round
+                self.next_turn()
+            elif move_type == 'challenge':
+                self.game_state['lose_influence_target'] = self.get_loser_from_challenge(
+                                                            self.game_state['counter_player'], 
+                                                            self.turn_player, 
+                                                            self.game_state['counter_played']
+                                                        )
+                self.game_state['wait'] = 'lose_influence'
 
         elif self.game_state['wait'] == 'lose_influence':
             if not move_type == 'select-influence':
                 logging.error(f'Expected select-influence movetype: Player move {(move_type, move, target)}')
             self.name_to_player[player_name].lose_influence(Influence.from_str(move))
-            self.next_turn()
+
+            # Counteraction failed, action is effective.
+            if self.game_state['lose_influence_target'] == self.game_state['turn']:
+                self.apply_action_and_next_turn(self.game_state['action_played'], self.game_state['turn'], self.game_state['action_target'])
+            else:
+                self.next_turn()
 
         elif self.game_state['wait'] == 'exchange_influence':
-            pass
+            raise NotImplementedError
 
         else:
             logging.error(f"Unexpected move type {move_type}")
@@ -298,7 +368,7 @@ class CoupGame(object):
                 if player == self.turn_player:
                     player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
-                        'message':[action.value for action in Actions]
+                        'message':[action.value for action in player.get_doable_actions()]
                     }
                 else:
                     player_moves_msg[player.name] = {
@@ -306,14 +376,16 @@ class CoupGame(object):
                         'message':[]
                     }
         elif self.game_state['wait'] == 'counter_or_challenge':
-            assert self.game_state['action_played']
-            counters_and_challenge = [Challenge.CHALLENGE.value]
+            assert self.game_state['action_played'], "No action played set"
+            counters_and_challenge = [Pass.PASS.value]
+            if self.game_state['action_played'] is not Actions.FOREIGN_AID:
+                counters_and_challenge.append(Challenge.CHALLENGE.value)
             counter = Counteractions.get_counter_from_action(self.game_state['action_played'])
             if counter:
                 counters_and_challenge.append(counter.value)
             
             for player in self.players:
-                if player == self.turn_player:
+                if player == self.turn_player or player.name in self.game_state['pass']:
                     player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
                         'message':[]
@@ -328,7 +400,7 @@ class CoupGame(object):
                 if player == self.turn_player:
                     player_moves_msg[player.name] = {
                         'header':'player-valid-moves',
-                        'message':[Challenge.CHALLENGE.value]
+                        'message':[Challenge.CHALLENGE.value, Pass.PASS.value]
                     }
                 else:
                     player_moves_msg[player.name] = {
@@ -337,7 +409,7 @@ class CoupGame(object):
                     }
         elif self.game_state['wait'] == 'lose_influence':
             for player in self.players:
-                if player == self.game_state['challenge_loser']:
+                if player == self.game_state['lose_influence_target']:
                     player_moves_msg[player.name] = {
                         'header':'player-influence-query',
                         'message':player.get_influence_in_player_perspective()
@@ -351,7 +423,7 @@ class CoupGame(object):
         if not player_moves_msg:
             logging.error("Player state undefined")
 
-        logging.info(f'CoupGame {self.name} broadcasting game_state:\n{json.dumps(player_moves_msg, indent=4)}')
+        logging.debug(f'CoupGame {self.name} broadcasting game_state:\n{json.dumps(player_moves_msg, indent=4)}')
         await self.channel_layer.group_send(
             self.name, {
                 'type': 'game_state_update',
@@ -396,7 +468,7 @@ class CoupGame(object):
                 'message': states_viewed_by_player 
             }
 
-        logging.info(f'CoupGame {self.name} broadcasting player state:\n {json.dumps(player_states_msg, indent=4)}')
+        logging.debug(f'CoupGame {self.name} broadcasting player state:\n {json.dumps(player_states_msg, indent=4)}')
         await self.channel_layer.group_send(
             self.name, {
                 'type': 'game_state_update',
@@ -406,7 +478,7 @@ class CoupGame(object):
     
     # Helper function for broadcasting generic message
     async def broadcast_message_to_room(self, header, message):
-        logging.info(f'CoupGame {self.name} broadcasting:\n {header}: {json.dumps(message, indent=4)}')
+        logging.debug(f'CoupGame {self.name} broadcasting:\n {header}: {json.dumps(message, indent=4)}')
         await self.channel_layer.group_send(
             self.name, {
                 'type': 'game_message',

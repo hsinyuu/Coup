@@ -50,7 +50,7 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         text_data_json = json.loads(text_data)
         header = text_data_json.get('header')
         message = text_data_json.get('message')
-        logging.info(f'Received message from client:\n{json.dumps(text_data_json, indent=4)}')
+        logging.debug(f'Received message from client:\n{json.dumps(text_data_json, indent=4)}')
 
         if header == 'chat-message':
             await self.broadcast_message_to_room(message)
@@ -59,7 +59,7 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         elif header == 'start-game':
             await self.send_message_to_game_engine(handler='start_game', message=None)
         else:
-            logging.error(f"Received bad message header {header}: {message} from client")
+            logging.error(f"Received bad message {header}: {message} from client")
 
     async def room_chat_message(self, event):
         """Receive room chat message from channel layer"""
@@ -69,11 +69,11 @@ class PlayerConsumer(AsyncWebsocketConsumer):
     
     async def game_engine_message(self, event):
         """Receive message from game engine, then propagate message to the client."""
-        logging.info(f'Received message from game-engine:\n{json.dumps(event, indent=4)}')
+        logging.debug(f'Received message from game-engine:\n{json.dumps(event, indent=4)}')
         await self.send_message_to_client(header=event.get('header'), message=event.get('message'))
     
     async def game_message(self, event):
-        logging.info(f'Received message from game:\n {json.dumps(event, indent=4)}')
+        logging.debug(f'Received message from game:\n {json.dumps(event, indent=4)}')
         await self.send_message_to_client(header=event.get('header'), message=event.get('message'))
 
     async def game_state_update(self, event):
@@ -90,7 +90,7 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         )
     
     async def send_message_to_client(self, header, message):
-        logging.info(f'Send message to client {self.player_name}:\n{header}:{json.dumps(message, indent=4)}')
+        logging.debug(f'Send message to client {self.player_name}:\n{header}:{json.dumps(message, indent=4)}')
         await self.send(
             text_data=json.dumps(
                 {
@@ -128,7 +128,7 @@ class GameEngineConsumer(AsyncConsumer):
         self.games = dict()
 
     async def game_move(self, event):
-        logging.info(f"Received message:\n{json.dumps(event, indent=4)}")
+        logging.debug(f"Received message:\n{json.dumps(event, indent=4)}")
         message = event.get('message')
         room_name = event.get('room_group_name')
         room_game = self.games[room_name]
@@ -139,11 +139,13 @@ class GameEngineConsumer(AsyncConsumer):
             move=message.get('move'),
             target=message.get('target')
         )
+        import pprint
+        logging.info(pprint.pformat(room_game.game_state, indent=4))
         await room_game.broadcast_game_state()
         await room_game.broadcast_player_state()
     
     async def start_game(self, event):
-        logging.info(f"Received message:\n{json.dumps(event, indent=4)}")
+        logging.debug(f"Received message:\n{json.dumps(event, indent=4)}")
         room_name = event.get('room_group_name')
         room_game = self.games[room_name]
         await room_game.start_game()
@@ -151,7 +153,7 @@ class GameEngineConsumer(AsyncConsumer):
         await room_game.broadcast_player_state()
 
     async def join_game(self, event):
-        logging.info(f"Received message\n{json.dumps(event, indent=4)}")
+        logging.debug(f"Received message\n{json.dumps(event, indent=4)}")
         room_name = event.get('room_group_name')
         new_player = event.get('sender')
 
@@ -166,7 +168,7 @@ class GameEngineConsumer(AsyncConsumer):
         await self.broadcast_message_to_room(room_name, header='chat-message', message=f"Master: {new_player} joined the room")
     
     async def broadcast_message_to_room(self, room_name, header, message):
-        logging.info(f'game-engine broadcasting {header}\n{json.dumps(message, indent=4)}')
+        logging.debug(f'game-engine broadcasting {header}\n{json.dumps(message, indent=4)}')
         await self.channel_layer.group_send(
             room_name, {
                 'type': 'game_engine_message',
