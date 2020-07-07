@@ -40,10 +40,10 @@ Room
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='income'>Income</Button>
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='foreign-aid'>Foreign Aid</Button>
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='tax'>Tax (Duke)</Button>
-        <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='steal'>Steal (Captain)</Button>
-        <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='assassinate'>Assassinate (Assassin)</Button>
+        <Button onclick="showPickTargetButtons(this,'action')" class='btn btn-warning btn-sm' id='steal'>Steal (Captain)</Button>
+        <Button onclick="showPickTargetButtons(this,'action')" class='btn btn-warning btn-sm' id='assassinate'>Assassinate (Assassin)</Button>
         <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='exchange'>Exchange (Ambassador)</Button>
-        <Button onclick="sendPlayerMove(this,'action')" class='btn btn-warning btn-sm' id='coup'>Coup</Button>
+        <Button onclick="showPickTargetButtons(this,'action')" class='btn btn-warning btn-sm' id='coup'>Coup</Button>
         <Button onclick="sendPlayerMove(this,'pass')" class='btn btn-dark btn-sm' id='pass'>Pass</Button>
         </div>
     </div>
@@ -178,6 +178,19 @@ Room
         sendPlayerMove(elem, move_type)
     };
 
+    const sendMoveWithTargetSelect = (elem) => {
+        $('.select-player').prop('hidden', true);
+        sendMessageToSocket('game-move', 
+            {
+                'type': 'action',
+                'move': elem.innerHTML,
+                'target': elem.id
+
+            }
+        )
+        disableButtonArray(gameplayButtons);
+    }
+
 
     const sendMessageToSocket = (header, message) => {
         gameSocket.send(JSON.stringify({
@@ -199,11 +212,12 @@ Room
             formattedPlayerState += generateFormattedInfluenceBadge(playerState.influence[1].card, playerState.influence[1].state);
             if (!playerState.playing)
                 formattedPlayerState += " (Observer)";
-
             if (playerState.is_self) {
                 playerListElem.innerHTML += "<li class=\"list-group-item list-group-item-warning\">" + formattedPlayerState + "</li>"
             }
             else {
+                if (playerState.playing)
+                    formattedPlayerState += "<Button onclick='sendMoveWithTargetSelect(this)' class='btn btn-danger btn-sm select-player' id='" + playerState.name + "' hidden>Select</Button>"
                 playerListElem.innerHTML += "<li class=\"list-group-item\">" + formattedPlayerState + "</li>"
             }
         });
@@ -241,6 +255,7 @@ Room
         $('#player-influence').prop('hidden', false);
         playerInfluenceListElem.innerHTML = 'Influence';
         playerInfluenceList.forEach((item,idx) => {
+            
             playerInfluenceListElem.innerHTML += generateFormattedInfluenceButton(item.card, item.state);
         });
     };
@@ -262,6 +277,11 @@ Room
             }
         );
     };
+
+    const showPickTargetButtons = (elem, move_type) => {
+        $('.select-player').html(elem.id);
+        $('.select-player').prop('hidden', false);
+    }
 
 </script>
 
