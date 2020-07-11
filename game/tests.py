@@ -2,11 +2,10 @@ from django.test import TestCase
 from game.coup_game.coup_game import CoupGame
 from game.coup_game.turn.state import TurnState
 from game.coup_game.exceptions import NotEnoughPlayer
-from game.coup_game.move import Actions, Counteractions, GenericMove
+from game.coup_game.move import Actions, Counteractions, GenericMove, VALID_MOVES
 from game.coup_game.objects import Influence
 
 # Create your tests here.
-
 class CoupGameTestCase(TestCase):
     def setUp(self):
         self.game = CoupGame('test')
@@ -320,3 +319,45 @@ class CoupGameTestCase(TestCase):
         self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card1)
         moves = self.game.get_valid_moves_for_player(player=turn_player)
         self.assertCountEqual(moves, [])    # No action available once two cards have been exchanged
+
+import io
+from game.coup_game.message import GameMoveSerializer, ChatSerializer
+
+class MessageTestCase(TestCase):
+    def test_move_serializer(self):
+        data = {
+            "player":"bob",
+            "move":"income"
+        }
+        serializer = GameMoveSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+        move = serializer.create()
+        self.assertTrue(isinstance(move.move, VALID_MOVES))
+        self.assertEqual(move.player, data['player'])
+
+    def test_move_serializer_invalid(self):
+        data = {
+            "player":"bob",
+            "move":"undefined_move"
+        }
+        serializer = GameMoveSerializer(data=data)
+        self.assertFalse(serializer.is_valid())
+    
+    def test_chat_serializer(self):
+        data = {
+            "player":"bob",
+            "message":"hello"
+        }
+        serializer = ChatSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+        chat = serializer.create()
+        self.assertEqual(chat.message, data['message'])
+        self.assertEqual(chat.player, data['player'])
+
+    def test_chat_serializer_invalid(self):
+        data = {
+            "player":"bob",
+            "message":"c"*201
+        }
+        serializer = ChatSerializer(data=data)
+        self.assertFalse(serializer.is_valid())

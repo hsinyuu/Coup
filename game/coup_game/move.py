@@ -1,5 +1,4 @@
 import enum
-
 class Actions(enum.Enum):
     INCOME = 'income'
     FOREIGN_AID = 'foreign-aid'
@@ -142,3 +141,5 @@ class GameMoveFactory(object):
         if coins >= 7:
             doable_actions.append(Actions.COUP)
         return doable_actions
+
+VALID_MOVES = (Actions, Counteractions, GenericMove)

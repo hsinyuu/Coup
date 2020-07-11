@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'game',
     'channels',
+    'rest_framework',
     'django_nose',
     'django.contrib.admin',
     'django.contrib.auth',
