@@ -124,15 +124,19 @@ USE_TZ = True
 STATIC_URL = '/static/'
 #TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
 
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'f',
         },
     },
+    'formatters': {
+        'f': {'format':
+              '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'}
+        },
     'root': {
         'handlers': ['console'],
         'level': 'INFO',

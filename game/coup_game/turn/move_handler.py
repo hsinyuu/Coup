@@ -9,7 +9,7 @@ from collections import namedtuple
 from game.coup_game.turn.state import TurnState
 from game.coup_game.move import Actions, Counteractions, GenericMove
 from game.coup_game.objects import Influence
-from game.coup_game.exceptions import BadPlayerMove
+from game.coup_game.exceptions import BadPlayerMove, BadTurnState
 
 def default_handler(turn, player, move, target):
     raise NotImplementedError

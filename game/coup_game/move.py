@@ -67,34 +67,6 @@ class GenericMove(enum.Enum):
     @classmethod
     def from_str(cls, string_key):
         return cls[string_key.upper()]
-    
-class Challenge(enum.Enum):
-    CHALLENGE = 'challenge'
-
-    @classmethod
-    def from_str(cls, string_key):
-        return cls[string_key.upper()]
-    
-    @classmethod
-    def from_action_or_counter(cls, action_or_counter):
-        if action_or_counter is Actions.INCOME:
-            return None
-        return cls.CHALLENGE
-
-class Pass(enum.Enum):
-    PASS = 'pass'
-
-    @classmethod
-    def from_str(cls, string_key):
-        return cls[string_key.upper()]
-    
-class Control(enum.Enum):
-    START_GAME = 'start_game'
-    RESTART_GAME = 'restart_game'
-
-    @classmethod
-    def from_str(cls, string_key):
-        return cls[string_key.upper()]
 
 class GameMoveFactory(object):
     """This is a static class that lays out the rules of action to counteractions"""
@@ -143,3 +115,12 @@ class GameMoveFactory(object):
         return doable_actions
 
 VALID_MOVES = (Actions, Counteractions, GenericMove)
+
+def str_to_move(move_str):
+    """Convert move string to move object"""
+    for move in VALID_MOVES:
+        try:
+            return move(move_str)
+        except ValueError:
+            pass
+    return None 

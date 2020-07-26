@@ -22,21 +22,7 @@ class CoupGamePlayer(object):
         assert influence in self.owned_influence, f"Player does not own {influence}"
         self.owned_influence.remove(influence)
         self.lost_influence.append(influence)
-    
-    def get_influence_in_opponent_perspective(self):
-        """Return list of influence in string in the perspective of opponents."""
-        # Opponents should only see influence that were lost by the player,
-        # we use '*' string to denote folded influence.
-        viewed_influence = [{'card':'*', 'state':'folded'}]*len(self.owned_influence)
-        viewed_influence.extend([{'card':inf.value, 'state':'revealed'} for inf in self.lost_influence])
-        return viewed_influence
-    
-    def get_influence_in_player_perspective(self):
-        """Return list of influence in string in the perspective of the owner."""
-        viewed_influence = [{'card':inf.value, 'state': 'folded'} for inf in self.owned_influence]
-        viewed_influence.extend([{'card':inf.value, 'state':'revealed'} for inf in self.lost_influence])
-        return viewed_influence
-    
+
     def is_in_game(self):
         if self.owned_influence:
             return True
