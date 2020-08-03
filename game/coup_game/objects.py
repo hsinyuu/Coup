@@ -51,3 +51,10 @@ class CourtDeck(object):
         assert isinstance(card, Influence), f'Bad value for card {card}'
         self._deck.append(card)
         self.shuffle()
+
+def str_to_inf(inf_str):
+    """Convert influence string to Influence enum"""
+    try:
+        return Influence(inf_str)
+    except ValueError:
+        return None

@@ -23,7 +23,10 @@ Room
             <div readonly id='message-log' style='height:100%;width:100%;border:none;overflow-y:scroll'>messagelog</div>
         </div>
         <div class='col-8 border' style='height:400px'>
-            <div class='row'id='game-view'>
+            <div class='row' style='height:300px;' id='game-view'>
+            </div>
+            <div class='row border' style='height:100px;' id='player-view'>
+                asdf
             </div>
         </div>
     </div>
@@ -43,28 +46,28 @@ Room
     <div class='row'>
         <div class='col-12 border' style='height:40px'>
         Actions
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='income'>Income</Button>
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='foreign-aid'>Foreign Aid</Button>
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='tax'>Tax (Duke)</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='income'>Income</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='foreign-aid'>Foreign Aid</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='tax'>Tax (Duke)</Button>
         <Button onclick="showPickTargetButtons(this)" class='btn btn-warning btn-sm' id='steal'>Steal (Captain)</Button>
         <Button onclick="showPickTargetButtons(this)" class='btn btn-warning btn-sm' id='assassinate'>Assassinate (Assassin)</Button>
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='exchange'>Exchange (Ambassador)</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='exchange'>Exchange (Ambassador)</Button>
         <Button onclick="showPickTargetButtons(this)" class='btn btn-warning btn-sm' id='coup'>Coup</Button>
-        <Button onclick="sendPlayerMove(this)" class='btn btn-dark btn-sm' id='pass'>Pass</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-dark btn-sm' id='pass'>Pass</Button>
         </div>
     </div>
     <div class='row'>
         <div class='col-12 border' style='height:40px'>
         Counteractions
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='block-foreign-aid'>Block Foreign Aid (Duke)</Button>
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='block-steal'>Block Steal (Captain/Ambassador)</Button>
-        <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='block-assassination'>Block Assassination (Contessa)</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='block-foreign-aid'>Block Foreign Aid (Duke)</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='block-steal'>Block Steal (Captain/Ambassador)</Button>
+        <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='block-assassination'>Block Assassination (Contessa)</Button>
         </div>
     </div>
     <div class='row'>
         <div class='col-12 border' style='height:40px'>
         Challenge
-            <Button onclick="sendPlayerMove(this)" class='btn btn-warning btn-sm' id='challenge'>Challenge</Button>
+            <Button onclick="sendPlayerMoveFromDOMElement(this)" class='btn btn-warning btn-sm' id='challenge'>Challenge</Button>
         </div>
     </div>
 </div>
@@ -79,7 +82,16 @@ Room
 
     const enableButtonArray = (buttonIdArray) => {
         setButtonDisableProp(buttonIdArray, false);
+        setAutoToggleButtonHiddenProp(buttonIdArray, false);
     };
+
+    const setAutoToggleButtonHiddenProp = (buttonIdArray, hiddenFlag) => {
+        buttonIdArray.forEach( 
+            (buttonId) => {
+                $("[id^=" + buttonId).prop('hidden', hiddenFlag);
+            }
+        )
+    }
 
     const setButtonDisableProp = (buttonIdArray, disableFlag) => {
         if (buttonIdArray.length == 0)
@@ -90,6 +102,7 @@ Room
             }
         );
     };
+
     const sendGameControl = (elem, val) => {
         console.log('Send control: ' + elem.id + ', value: ' + val);
         gameSocket.send(JSON.stringify({
@@ -99,15 +112,36 @@ Room
             'value': val
         }))
     }
-    const sendPlayerMove = (elem) => {
-        console.log('Send move: ' + elem.id);
+
+    const sendPlayerMoveFromDOMElement = (elem) => {
+        sendPlayerMove(elem.id, null);
+    };
+
+
+    const showPickTargetButtons = (elem) => {
+        const move = elem.id;
+        $('.select-target').html(move);
+        $('.select-target').prop('hidden', false);
+    }
+
+    const sendMoveWithTarget = (elem, target) => {
+        $('.select-target').prop('hidden', true);
+        sendPlayerMove(elem.innerHTML, target);
+    }
+
+    const toggleButtonAndSendLoseInfluenceMove = (elem, cardToLose) => {
+        sendPlayerMove('lose-influence', cardToLose);
+    }
+
+    const sendPlayerMove = (move, target) => {
+        console.log('Send move: ' + move + ' ' + target);
         gameSocket.send(JSON.stringify({
             'type': 'game.move',
             'player': '{{user.get_username}}',
-            'move': elem.id,
-            'target': null
+            'move': move,
+            'target': target
         }))
-    };
+    }
     /*********************************/
     /*       Global variables        */
     /*********************************/
@@ -123,7 +157,7 @@ Room
         'block-steal', 
         'block-assassination',
         'challenge',
-        'pass'
+        'pass',
     ]
 
     const roomName = document.getElementById('room-name').textContent;
@@ -136,14 +170,6 @@ Room
         + '/'
     );
 
-    let seatNumToPlayer = {
-        0: null,
-        1: null,
-        2: null,
-        3: null,
-        4: null,
-        5: null,
-    }
 
     /*********************************/
     /*       Socket Handlers         */
@@ -154,9 +180,11 @@ Room
         if (data.type == "chat") {
             document.querySelector('#message-log').innerHTML += '<div>' + data.message + '</div>';
         } else if (data.type == "frontend.update") {
-            const {game_view, interface} = data;
+            const {game_view, player_view, interface} = data;
             if (game_view != undefined)
                 updateGameViewComponent(game_view);
+            if (player_view != undefined)
+                updatePlayerViewComponent(player_view);
             if (interface != undefined)
                 updateInterface(interface);
         } else {
@@ -190,37 +218,56 @@ Room
     /*         Componenets           */
     /*********************************/
 
-    const generateCardComponent = (card) => {
-        style = 'height:100px;'
-        if (card == 'flipped') {
-            card = '-'
-        }
-        return "<div class='border col' style=" + style + ">" +
+    const generateGameViewCardComponent = (card) => {
+        style = 'height:80px;'
+        return "<span class='col border badge badge-light' style=" + style + ">" +
                 card +
-                "</div>"
+                "</span>"
+    }
+
+    const generatePlayerViewCardComponent = (card, status, idx) => {
+        spanClass = 'border col badge '
+        spanCSSStyle = 'height:80px;width:100px'
+        spanInnerHTML = card
+        if (status == 'died') {
+            spanClass += 'badge-danger'
+            spanInnerHTML += ' DEAD'
+        } else {
+            spanClass += 'badge-light'
+        }
+
+        clickHandler = "toggleButtonAndSendLoseInfluenceMove(this, '" + card + "')";
+        
+        return "<span class=\'" + spanClass + "\' style=\'" + spanCSSStyle + "\'>" +
+                spanInnerHTML +
+                "<Button id='" + card + idx + "' " +
+                "onclick=\"" + clickHandler + "\" " + 
+                "class='btn btn-danger btn-sm' hidden>kill</Button>" +
+                "</span>"
     }
     const generatePlayerStateComponent = (playerState) => {
         const {player, seat, coins, cards, status, turn} = playerState;
         if (player == undefined) {
             // Empty seat
-            return  "<div class='col-3 border' style='height:200px'>" +
+            return  "<div class='col-2 border' style='height:200px'>" +
                         "<p>Empty Seat " + seat + "</p>" +
                         "<Button onclick=\"sendGameControl(this, " + seat + ")\" class='btn badge-primary' id='change-seat'>+</div>" +
                     "</div>"
         } else if (coins == undefined) {
             // Show joined player 
-            return  "<div class='col-3 border' style='height:200px'>" +
+            return  "<div class='col-2 border' style='height:200px'>" +
                         "<h3>" + player + "</h3>" +
                     "</div>"
         } else {
             // Show player in game state
-            return  "<div class='col-3 border' style='height:200px'>" +
-                        "<h3>" + player + "</h3>" +
+            return  "<div class='col-2 border player-state' style='height:200px'>" +
+                        "<h3>" + player + "</h3>" + 
                         "<p>Coins " + coins + "</p>" +
                         "<div class='row'>" +
-                           generateCardComponent(cards[0]) +
-                           generateCardComponent(cards[1]) +
-                       "</div>"
+                           generateGameViewCardComponent(cards[0]) +
+                           generateGameViewCardComponent(cards[1]) +
+                       "</div>" +
+                        "<Button onclick='sendMoveWithTarget(this, \""+ player + "\")' class='btn btn-danger btn-sm select-target' hidden>Select</Button>" +
                     "</div>"
         }
     };
@@ -232,6 +279,22 @@ Room
         gameView.innerHTML = ''
         gameViewStateArray.forEach(state => gameView.innerHTML += generatePlayerStateComponent(state))
     };
+
+    const updatePlayerViewComponent = (playerViewState) => {
+        console.log(playerViewState)
+        const {cards, coins, player} = playerViewState;
+        playerView = document.querySelector('#player-view')
+        playerView.innerHTML = 
+            "<div style='width:100px'>" +
+            "coins: " + coins +
+            "</div>" +
+            "<div>" + 
+            generatePlayerViewCardComponent(cards[0].name, cards[0].status, 0) + 
+            "</div>" + 
+            "<div>" +
+            generatePlayerViewCardComponent(cards[1].name, cards[1].status, 1) + 
+            "</div>"
+    }
 
     const updateInterface = (interfaceArray) => {
         disableButtonArray(gameplayButtons);

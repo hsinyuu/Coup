@@ -32,6 +32,7 @@ class CoupGameFrontend(object):
         pass
 
     def game_view(self, game):
+        """View of all player's cards and coins."""
         assert isinstance(game, CoupGame), 'Bad value for game'
 
         # Get game state and send updates
@@ -44,7 +45,7 @@ class CoupGameFrontend(object):
                 game_view.append({'player':seated_player_name, 'seat': seat})
             return game_view
 
-        for player in game.players:
+        for player in game.get_players_in_seating_order():
             cards = list()
             for lost_card in player.lost_influence:
                 cards.append(lost_card.value)
@@ -59,7 +60,26 @@ class CoupGameFrontend(object):
                 'turn': game.turn_player == player
             })
         return game_view
+    
+    def player_view(self, game, player):
+        """View of the in game player. Contains cards and number of coins."""
+        if not game.started:
+            return None
         
+        cards = list()
+        for lost_card in player.lost_influence:
+            cards.append({'name': lost_card.value, 'status': 'died'})
+
+        for owned_card in player.owned_influence:
+            cards.append({'name': owned_card.value, 'status': 'owned'})
+
+        player_view = {
+            'player': player.name,
+            'coins': player.coins,
+            'cards': cards,
+        }
+        return player_view
+
     def player_interface(self, game, player):
         assert isinstance(game, CoupGame), 'Bad value for game'
         assert isinstance(player, CoupGamePlayer), 'Bad value for player'
@@ -92,6 +112,11 @@ class CoupGame(object):
     @property
     def turn_player(self):
         return self.players[self._turn_player_index]
+    
+    def get_players_in_seating_order(self):
+        return [self.player_seats[seat] \
+            for seat in range(self.MAX_NUM_PLAYERS) \
+                if self.player_seats[seat]]
     
     def is_game_full(self):
         return self.get_num_players() == self.MAX_NUM_PLAYERS

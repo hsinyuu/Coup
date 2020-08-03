@@ -135,7 +135,8 @@ LOGGING = {
     },
     'formatters': {
         'f': {'format':
-              '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'}
+#              '%(asctime)s %(name)-12s %(levelname)-4s %(filename)-8s %(lineno)-4d %(message)s'}
+              '%(name)-12s %(levelname)-4s %(filename)-8s %(lineno)-4d %(message)s'}
         },
     'root': {
         'handlers': ['console'],

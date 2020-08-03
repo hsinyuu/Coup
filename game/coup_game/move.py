@@ -62,7 +62,7 @@ class Counteractions(enum.Enum):
 class GenericMove(enum.Enum):
     PASS = 'pass'
     CHALLENGE = 'challenge'
-    LOSE_INFLUENCE = 'lose_influence'
+    LOSE_INFLUENCE = 'lose-influence'
 
     @classmethod
     def from_str(cls, string_key):

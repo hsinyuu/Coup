@@ -5,6 +5,8 @@ from channels.consumer import AsyncConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from game.coup_game.coup_game import CoupGame, CoupGameFrontend
 from game.coup_game.move import str_to_move
+from game.coup_game.objects import str_to_inf
+from game.coup_game.exceptions import BadPlayerMove, BadGameState, BadTurnState
 import game.serializers as serializers
 
 class PlayerConsumer(AsyncWebsocketConsumer):
@@ -25,7 +27,7 @@ class PlayerConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         data = serializers.text_data_to_data(text_data)
-        logging.debug(f'Received data {data}')
+        logging.info(f'Received data {data}')
 
         try:
             serializer = serializers.create_serializer(data)
@@ -63,7 +65,6 @@ class PlayerConsumer(AsyncWebsocketConsumer):
             logging.error(f'No update for player {self.player_name} in individual update event {event}')
             resp = {'errors': 'Internal server error. No update for player'}
             await self.send(text_data=json.dumps(resp))
-            import pdb; pdb.set_trace()
             return
         player_event = event[self.player_name]
         player_event['type'] = 'frontend.update'
@@ -91,16 +92,32 @@ class RoomManagerConsumer(AsyncConsumer):
         logging.info('Room manager initialized')
     
     async def game_move(self, event):
+        def target_str_to_obj(target):
+            if target:
+                target_player = game.get_player_by_name(event.get('target'))
+                target_card = str_to_inf(event.get('target'))
+                if target_player:
+                    return target_player
+                elif target_card:
+                    return target_card
+            return None
+
         room = event.get('room')
         game = self.games[room]
 
         # Convert string to objects
         move = str_to_move(event.get('move'))
         player = game.get_player_by_name(event.get('player'))
-        target = None
-        if event.get('target'):
-            target = game.get_player_by_name(event.get('target'))
-        game.player_make_move(player=player, move=move, target=target)
+        target = target_str_to_obj(event.get('target'))
+        try:
+            game.player_make_move(player=player, move=move, target=target)
+        except BadPlayerMove as ex:
+            logging.error(ex)
+        except BadTurnState as ex:
+            logging.error(ex)
+        except BadGameState as ex:
+            logging.error(ex)
+
         await self._send_frontend_to_players(room, game)
     
     async def game_control(self, event):
@@ -146,7 +163,10 @@ class RoomManagerConsumer(AsyncConsumer):
 
         individual_update = {'type': 'individual.frontend.update'}
         for player in game.players:
-            individual_update[player.name] = {'interface': self.coup_frontend.player_interface(game, player)}
+            individual_update[player.name] = {
+                'interface': self.coup_frontend.player_interface(game, player),
+                'player_view': self.coup_frontend.player_view(game, player)
+            }
         await self.channel_layer_sender.broadcast_to_group(room, individual_update)
             
 class ChannelLayerMessageSender(object):
@@ -154,9 +174,9 @@ class ChannelLayerMessageSender(object):
         self._channel_layer = channel_layer
     
     async def broadcast_to_group(self, group_name, data):
-        logging.info(f'Broadcasting to {group_name} : {data}')
+        logging.debug(f'Broadcasting to {group_name} : {data}')
         await self._channel_layer.group_send(group_name, data)
 
     async def send_to_consumer(self, consumer_name, data):
-        logging.info(f'Sending to consumer {consumer_name} : {data}')
+        logging.debug(f'Sending to consumer {consumer_name} : {data}')
         await self._channel_layer.send(consumer_name, data)
