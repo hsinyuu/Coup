@@ -267,13 +267,25 @@ Room
             return  "<div class='col-2 border' style='height:200px'>" +
                         "<h3>" + player + "</h3>" +
                     "</div>"
+        } else if (status == 'dead') {
+            // Show player in game state
+            let style = "height:200px;";
+            return  "<div class='col-2 border player-state' style='" + style + "'>" +
+                        "<h3>" + player + "</h3>" + 
+                        "<div>Observing</div>" +
+                    "</div>"
         } else {
             let turn_str = "";
             let style = "height:200px;";
+            let targetButton = "";
             if (turn)
                 turn_str = "Turn Player";
             if (player == '{{user.get_username}}')
                 style += "background-color:#fad105";
+            else
+                targetButton = "<Button onclick='sendMoveWithTarget(this, \""+ player + "\")' " + 
+                                "class='btn btn-danger btn-sm select-target' hidden>"
+                                "Select</Button>";
 
             let cardsComponent = "";
             cards.forEach(card => cardsComponent += generateGameViewCardComponent(card));
@@ -286,7 +298,7 @@ Room
                             cardsComponent +
                        "</div>" +
                        "<div>" + turn_str + "</div>" +
-                        "<Button onclick='sendMoveWithTarget(this, \""+ player + "\")' class='btn btn-danger btn-sm select-target' hidden>Select</Button>" +
+                       targetButton +
                     "</div>"
         }
     };

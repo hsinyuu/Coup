@@ -121,6 +121,37 @@ class CoupGameTestCase(TestCase):
         self.assertIn(new_card0, turn_player.owned_influence)
         self.assertIn(new_card1, turn_player.owned_influence)
 
+    def test_challenged_action_exchange_lost(self):
+        # Turn player exchange action got challenged and lost. 
+        # We expect only one owned influence and one lost influence, and exchange action
+        # does not take into effect.
+        turn_player = self.game.turn_player
+        opponents = [pl for pl in self.game.players if not pl == turn_player]
+        opp = opponents[0]
+
+        # Force turn player to 'NOT' have ambassador
+        turn_player.owned_influence.pop()
+        turn_player.owned_influence.pop()
+        card_to_keep = Influence.CONTESSA
+        card_to_lose = Influence.DUKE
+        turn_player.owned_influence.append(card_to_keep)
+        turn_player.owned_influence.append(card_to_lose)
+
+        self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE)
+        self.game.player_make_move(player=opp, move=GenericMove.CHALLENGE, target=None)
+        self.assertEqual(self.game.turn.state, TurnState.LOSE_INFLUENCE)
+        self.game.player_make_move(player=turn_player, move=GenericMove.LOSE_INFLUENCE, target=card_to_lose)
+
+        # Player should lose one card
+        self.assertEqual(len(turn_player.owned_influence), 1)
+        self.assertEqual(len(turn_player.lost_influence), 1)
+        self.assertCountEqual(turn_player.owned_influence, [card_to_keep,])
+        self.assertCountEqual(turn_player.lost_influence, [card_to_lose,])
+
+        # Check next turn state
+        self.assertEqual(self.game.turn.state, TurnState.ACTION)    # Turn should reset
+        self.assertNotEqual(self.game.turn_player, turn_player)     # Turn should advance to next round
+
     def test_counter_block_foreign_aid(self):
         turn_player = self.game.turn_player
         opponents = [pl for pl in self.game.players if not pl == turn_player]

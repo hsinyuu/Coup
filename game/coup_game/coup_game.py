@@ -3,7 +3,7 @@ import pprint
 import enum
 import json
 from game.coup_game.objects import CourtDeck
-from game.coup_game.player import CoupGamePlayer
+from game.coup_game.player import CoupGamePlayer, PlayerStatus
 from game.coup_game.move import GameMoveFactory
 from game.coup_game.turn.turn import CoupGameTurn
 from game.coup_game.turn.state import TurnState
@@ -51,12 +51,13 @@ class CoupGameFrontend(object):
                 cards.append(lost_card.value)
             for owned_card in player.owned_influence:
                 cards.append('folded')
+
             game_view.append({
                 'player': player.name,
                 'seat': None,
                 'coins': player.coins,
                 'cards': cards,
-                'status': 'in_game',
+                'status': player.status.value,
                 'turn': game.turn_player == player
             })
         return game_view
@@ -138,9 +139,14 @@ class CoupGame(object):
     
     def next_turn(self):
         """Reset game state and update turn player to the next player in order"""
-        self._turn_player_index = (self._turn_player_index+1) % len(self.players)
-        if not self.turn_player.is_in_game():
+        found_player = False
+        for i in range(len(self.players)):
             self._turn_player_index = (self._turn_player_index+1) % len(self.players)
+            if self.turn_player.is_in_game():
+                found_player = True
+                break
+        if not found_player:
+            raise BadGameState("Cannot find in game player for the next turn")
         self.turn.reset_turn(self.turn_player)
 
         if self.get_winner():
@@ -208,7 +214,7 @@ class CoupGame(object):
             player.draw_influence_from_deck(self.deck)
 
         self._turn_player_index = 0
-        self.turn = CoupGameTurn(self.turn_player, self.get_num_players(), self.deck)
+        self.turn = CoupGameTurn(self.turn_player, self.players, self.deck)
 
         if self.get_num_players() < 2:
             raise NotEnoughPlayer(f"Unable to start game with {self.get_num_players()} players")
@@ -227,6 +233,7 @@ class CoupGame(object):
         if not self.started:
             raise BadGameState(f"Game {self.name} has not started yet")
         move_handler.apply_move_handler(self.turn, self.deck, player, move, target)
+        logging.debug("Current turn state: {turn.state}")
         if self.turn.is_done():
             self.next_turn()
     

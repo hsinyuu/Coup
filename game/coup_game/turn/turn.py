@@ -5,8 +5,8 @@ from game.coup_game.exceptions import BadPlayerMove, BadTurnState
 class CoupGameTurn(object):
     """Class to represent state variables of the current turn"""
     SAME_STATE_CHANGE_LIMIT = 3
-    def __init__(self, turn_player, num_players, court_deck):
-        self.num_players = num_players
+    def __init__(self, turn_player, players, court_deck):
+        self.players = players
         self.court_deck = court_deck
         self.reset_turn(turn_player)
         
@@ -103,7 +103,7 @@ class CoupGameTurn(object):
         if self.action_target or self.counter_played:
             self.pass_player_wait_cnt = 1
         else:
-            self.pass_player_wait_cnt = self.num_players-1
+            self.pass_player_wait_cnt = len([pl for pl in self.players if pl.is_in_game()]) - 1
 
     def __str__(self):
         return pprint.pformat({
