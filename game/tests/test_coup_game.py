@@ -309,13 +309,13 @@ class CoupGameTestCase(TestCase):
         new_card0 = turn_player.owned_influence[2]
         new_card1 = turn_player.owned_influence[3]
         moves = self.game.get_valid_moves_for_player(player=turn_player)
-        self.assertCountEqual(moves, [GenericMove.LOSE_INFLUENCE])
+        self.assertCountEqual(moves, [GenericMove.DISCARD_INFLUENCE])
 
-        self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card0)
+        self.game.player_make_move(player=turn_player, move=GenericMove.DISCARD_INFLUENCE, target=exchange_card0)
         moves = self.game.get_valid_moves_for_player(player=turn_player)
-        self.assertCountEqual(moves, [GenericMove.LOSE_INFLUENCE])
+        self.assertCountEqual(moves, [GenericMove.DISCARD_INFLUENCE])
 
-        self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card1)
+        self.game.player_make_move(player=turn_player, move=GenericMove.DISCARD_INFLUENCE, target=exchange_card1)
         moves = self.game.get_valid_moves_for_player(player=turn_player)
         self.assertCountEqual(moves, [])    # No action available once two cards have been exchanged
 
@@ -380,9 +380,9 @@ class FrontendTestCase(TestCase):
         game.player_make_move(player=turn_player, move=Actions.INCOME, target=None)
         game_view = self.fe.game_view(game)
         self.assertEqual(game_view, [
-                {'player': 'player0', 'seat': None, 'coins': 1, 'cards': ['folded', 'folded'], 'status': 'in_game', 'turn': False}, 
-                {'player': 'player1', 'seat': None, 'coins': 0, 'cards': ['folded', 'folded'], 'status': 'in_game', 'turn': True}, 
-                {'player': 'player2', 'seat': None, 'coins': 0, 'cards': ['folded', 'folded'], 'status': 'in_game', 'turn': False}
+                {'player': 'player0', 'seat': None, 'coins': 1, 'cards': ['folded', 'folded'], 'status': 'in-game', 'turn': False}, 
+                {'player': 'player1', 'seat': None, 'coins': 0, 'cards': ['folded', 'folded'], 'status': 'in-game', 'turn': True}, 
+                {'player': 'player2', 'seat': None, 'coins': 0, 'cards': ['folded', 'folded'], 'status': 'in-game', 'turn': False}
             ])
 
         for player in game.players:
