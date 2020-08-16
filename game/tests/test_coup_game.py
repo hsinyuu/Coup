@@ -115,8 +115,8 @@ class CoupGameTestCase(TestCase):
         self.assertEqual(len(turn_player.owned_influence), 4)
         new_card0 = turn_player.owned_influence[2]
         new_card1 = turn_player.owned_influence[3]
-        self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card0)
-        self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card1)
+        self.game.player_make_move(player=turn_player, move=GenericMove.DISCARD_INFLUENCE, target=exchange_card0)
+        self.game.player_make_move(player=turn_player, move=GenericMove.DISCARD_INFLUENCE, target=exchange_card1)
         self.assertEqual(len(turn_player.owned_influence), 2)
         self.assertIn(new_card0, turn_player.owned_influence)
         self.assertIn(new_card1, turn_player.owned_influence)
@@ -269,7 +269,7 @@ class CoupGameTestCase(TestCase):
         moves = self.game.get_valid_moves_for_player(player=opponent)
         self.assertCountEqual(moves, [])
         moves = self.game.get_valid_moves_for_player(player=turn_player)
-        self.assertCountEqual(moves, turn_player.owned_influence)
+        self.assertCountEqual(moves, [GenericMove.LOSE_INFLUENCE,])
 
     def test_valid_move_assassination_counter_challenge(self):
         turn_player = self.game.turn_player
@@ -283,7 +283,7 @@ class CoupGameTestCase(TestCase):
         self.game.player_make_move(player=target, move=GenericMove.CHALLENGE, target=None)
         
         moves = self.game.get_valid_moves_for_player(player=target)
-        self.assertCountEqual(moves, target.owned_influence)
+        self.assertCountEqual(moves, [GenericMove.LOSE_INFLUENCE,])
         moves = self.game.get_valid_moves_for_player(player=turn_player)
         self.assertCountEqual(moves, [])
 
@@ -309,11 +309,11 @@ class CoupGameTestCase(TestCase):
         new_card0 = turn_player.owned_influence[2]
         new_card1 = turn_player.owned_influence[3]
         moves = self.game.get_valid_moves_for_player(player=turn_player)
-        self.assertCountEqual(moves, [exchange_card0, exchange_card1, new_card0, new_card1])
+        self.assertCountEqual(moves, [GenericMove.LOSE_INFLUENCE])
 
         self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card0)
         moves = self.game.get_valid_moves_for_player(player=turn_player)
-        self.assertCountEqual(moves, [exchange_card1, new_card0, new_card1])
+        self.assertCountEqual(moves, [GenericMove.LOSE_INFLUENCE])
 
         self.game.player_make_move(player=turn_player, move=Actions.EXCHANGE, target=exchange_card1)
         moves = self.game.get_valid_moves_for_player(player=turn_player)

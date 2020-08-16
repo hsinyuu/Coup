@@ -63,6 +63,7 @@ class GenericMove(enum.Enum):
     PASS = 'pass'
     CHALLENGE = 'challenge'
     LOSE_INFLUENCE = 'lose-influence'
+    DISCARD_INFLUENCE = 'discard-influence'
 
     @classmethod
     def from_str(cls, string_key):

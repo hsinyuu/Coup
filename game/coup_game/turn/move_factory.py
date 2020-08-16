@@ -22,6 +22,8 @@ def register_move_getter(func):
     logging.info(f"Registered move generator {func.__name__} to for state {state_to_handle}")
 
 def get_move_for_player(turn, player):
+    if not player.is_in_game():
+        return []
     try:
         return _MOVE_GETTER[turn.state](turn, player)
     except KeyError as ex:
@@ -51,13 +53,13 @@ def get_move_for_wait_counter_response(turn, player):
 @register_move_getter
 def get_move_for_wait_lose_influence(turn, player):
     if player == turn.lose_influence_target:
-        return player.owned_influence
+        return [GenericMove.LOSE_INFLUENCE,]
     return []
 
 @register_move_getter
 def get_move_for_wait_exchange_influence(turn, player):
     if player == turn.action_player:
-        return player.owned_influence
+        return [GenericMove.DISCARD_INFLUENCE,]
     return []
 
 class GameMoveFactory(object):

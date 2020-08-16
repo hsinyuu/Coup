@@ -20,13 +20,12 @@ Room
     </div>
     <div class='row'>
         <div class='col-4 border' style='height:400px'>
-            <div readonly id='message-log' style='height:100%;width:100%;border:none;overflow-y:scroll'>messagelog</div>
+            <div readonly id='message-log' style='height:100%;width:100%;border:none;overflow-y:scroll'></div>
         </div>
         <div class='col-8 border' style='height:400px'>
             <div class='row' style='height:300px;' id='game-view'>
             </div>
             <div class='row border' style='height:100px;' id='player-view'>
-                asdf
             </div>
         </div>
     </div>
@@ -129,8 +128,8 @@ Room
         sendPlayerMove(elem.innerHTML, target);
     }
 
-    const toggleButtonAndSendLoseInfluenceMove = (elem, cardToLose) => {
-        sendPlayerMove('lose-influence', cardToLose);
+    const toggleButtonAndSendMoveOnCard = (elem, move, card) => {
+        sendPlayerMove(move, card);
     }
 
     const sendPlayerMove = (move, target) => {
@@ -178,7 +177,7 @@ Room
         console.log('Received message ' + e.data);
         const data = JSON.parse(e.data);
         if (data.type == "chat") {
-            document.querySelector('#message-log').innerHTML += '<div>' + data.message + '</div>';
+            document.querySelector('#message-log').innerHTML += '<div>' + data.player + ": " + data.message + '</div>';
         } else if (data.type == "frontend.update") {
             const {game_view, player_view, interface} = data;
             if (game_view != undefined)
@@ -219,30 +218,40 @@ Room
     /*********************************/
 
     const generateGameViewCardComponent = (card) => {
-        style = 'height:80px;'
-        return "<span class='col border badge badge-light' style=" + style + ">" +
+        spanStyle = 'height:80px;';
+        spanClass = 'col border badge ';
+        if (card == 'folded') {
+            spanClass += 'badge-dark';
+        } else {
+            spanClass += 'badge-danger';
+        }
+        return "<span class='" + spanClass + "' style=" + spanStyle + ">" +
                 card +
                 "</span>"
     }
 
     const generatePlayerViewCardComponent = (card, status, idx) => {
-        spanClass = 'border col badge '
-        spanCSSStyle = 'height:80px;width:100px'
         spanInnerHTML = card
+        spanClass = 'border col-2 badge '
+        spanCSSStyle = 'height:80px;width:100px'
+        loseInfluenceClickHandler = "toggleButtonAndSendMoveOnCard(this, 'lose-influence', '" + card + "')";
+        exchangeClickHandler = "toggleButtonAndSendMoveOnCard(this, 'discard-influence', '" + card + "')";
         if (status == 'died') {
             spanClass += 'badge-danger'
             spanInnerHTML += ' DEAD'
         } else {
             spanClass += 'badge-light'
+            spanInnerHTML += "<Button id='" + 'lose-influence' + idx + "' " +
+                     "onclick=\"" + loseInfluenceClickHandler + "\" " + 
+                     "class='btn btn-danger btn-sm' hidden>kill</Button>"
+            spanInnerHTML += "<Button id='" + 'discard-influence' + idx + "' " +
+                     "onclick=\"" + exchangeClickHandler + "\" " + 
+                     "class='btn btn-danger btn-sm' hidden>discard</Button>"
         }
 
-        clickHandler = "toggleButtonAndSendLoseInfluenceMove(this, '" + card + "')";
         
         return "<span class=\'" + spanClass + "\' style=\'" + spanCSSStyle + "\'>" +
                 spanInnerHTML +
-                "<Button id='" + card + idx + "' " +
-                "onclick=\"" + clickHandler + "\" " + 
-                "class='btn btn-danger btn-sm' hidden>kill</Button>" +
                 "</span>"
     }
     const generatePlayerStateComponent = (playerState) => {
@@ -259,14 +268,24 @@ Room
                         "<h3>" + player + "</h3>" +
                     "</div>"
         } else {
+            let turn_str = "";
+            let style = "height:200px;";
+            if (turn)
+                turn_str = "Turn Player";
+            if (player == '{{user.get_username}}')
+                style += "background-color:#fad105";
+
+            let cardsComponent = "";
+            cards.forEach(card => cardsComponent += generateGameViewCardComponent(card));
+
             // Show player in game state
-            return  "<div class='col-2 border player-state' style='height:200px'>" +
+            return  "<div class='col-2 border player-state' style='" + style + "'>" +
                         "<h3>" + player + "</h3>" + 
                         "<p>Coins " + coins + "</p>" +
                         "<div class='row'>" +
-                           generateGameViewCardComponent(cards[0]) +
-                           generateGameViewCardComponent(cards[1]) +
+                            cardsComponent +
                        "</div>" +
+                       "<div>" + turn_str + "</div>" +
                         "<Button onclick='sendMoveWithTarget(this, \""+ player + "\")' class='btn btn-danger btn-sm select-target' hidden>Select</Button>" +
                     "</div>"
         }
@@ -281,19 +300,24 @@ Room
     };
 
     const updatePlayerViewComponent = (playerViewState) => {
-        console.log(playerViewState)
         const {cards, coins, player} = playerViewState;
+        let cardsComponent = "";
+        cards.forEach((card, index) => cardsComponent += 
+            generatePlayerViewCardComponent(card.name, card.status, index))
         playerView = document.querySelector('#player-view')
         playerView.innerHTML = 
             "<div style='width:100px'>" +
             "coins: " + coins +
             "</div>" +
+            /*
             "<div>" + 
             generatePlayerViewCardComponent(cards[0].name, cards[0].status, 0) + 
             "</div>" + 
             "<div>" +
             generatePlayerViewCardComponent(cards[1].name, cards[1].status, 1) + 
             "</div>"
+            */
+            cardsComponent
     }
 
     const updateInterface = (interfaceArray) => {

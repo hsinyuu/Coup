@@ -11,7 +11,7 @@ from game.coup_game.move import Actions, Counteractions, GenericMove
 from game.coup_game.objects import Influence
 from game.coup_game.exceptions import BadPlayerMove, BadTurnState
 
-def default_handler(turn, player, move, target):
+def default_handler(turn, deck, player, move, target):
     raise NotImplementedError
 _MOVE_HANDLER = {state:default_handler for state in TurnState}
 
@@ -21,13 +21,13 @@ def register_move_handler(func):
     _MOVE_HANDLER[state_to_handle] = func
     logging.info(f"Registered move handler {func.__name__} to handle state {state_to_handle}")
 
-def apply_move_handler(turn, player, move, target):
+def apply_move_handler(turn, deck, player, move, target):
     try:
         if target:
             logging.info(f"{player} used {move} on {target}")
         else:
             logging.info(f"{player} used {move}")
-        _MOVE_HANDLER[turn.state](turn, player, move, target)
+        _MOVE_HANDLER[turn.state](turn, deck, player, move, target)
     except KeyError as ex:
         logging.error(f"Error: Handler does not exist for state {turn.state}")
 
@@ -49,7 +49,7 @@ def resolve_challenge(turn, player, challenger, challenged_move):
 
 # Move handler definition
 @register_move_handler
-def handle_move_for_wait_action(turn, player, move, target):
+def handle_move_for_wait_action(turn, deck, player, move, target):
     player.coins -= Actions.get_cost(move)
 
     # Validate
@@ -77,7 +77,7 @@ def handle_move_for_wait_action(turn, player, move, target):
         turn.change_state(TurnState.ACTION_RESPONSE)
 
 @register_move_handler
-def handle_move_for_wait_action_response(turn, player, move, target):
+def handle_move_for_wait_action_response(turn, deck, player, move, target):
     # Validate
     # ...
 
@@ -99,7 +99,7 @@ def handle_move_for_wait_action_response(turn, player, move, target):
         turn.change_state(TurnState.COUNTER_RESPONSE)
 
 @register_move_handler
-def handle_move_for_wait_counter_response(turn, player, move, target):
+def handle_move_for_wait_counter_response(turn, deck, player, move, target):
     # Validate
     if move not in (GenericMove.PASS, GenericMove.CHALLENGE):
         raise BadPlayerMove(f"Player should only be allowed to use pass and challenge. Got {move}")
@@ -116,7 +116,7 @@ def handle_move_for_wait_counter_response(turn, player, move, target):
         turn.change_state(TurnState.LOSE_INFLUENCE)
 
 @register_move_handler
-def handle_move_for_wait_lose_influence(turn, player, move, target):
+def handle_move_for_wait_lose_influence(turn, deck, player, move, target):
     # Validate
     if not isinstance(target, Influence):
         raise BadPlayerMove(f"Bad value for target {target} in state {turn.state}")
@@ -134,15 +134,15 @@ def handle_move_for_wait_lose_influence(turn, player, move, target):
         turn.change_state(TurnState.DONE)
 
 @register_move_handler
-def handle_move_for_wait_exchange_influence(turn, player, move, target):
+def handle_move_for_wait_exchange_influence(turn, deck, player, move, target):
     if not isinstance(target, Influence):
         raise BadPlayerMove(f"Bad value for target {target} in state {turn.state}")
-    if not move is Actions.EXCHANGE:
+    if not move is GenericMove.DISCARD_INFLUENCE:
         raise BadPlayerMove(f"Player should only be allowed to exchange card")
     if turn.num_cards_to_exchange <= 0:
         raise BadTurnState(f"Turn has shouldn't be in exchange card. No cards to exchange.")
 
-    player.lose_influence(target)
+    player.discard_card(target, deck)
     turn.num_cards_to_exchange -= 1
     if turn.num_cards_to_exchange == 0:
         turn.change_state(TurnState.DONE)

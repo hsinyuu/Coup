@@ -99,16 +99,23 @@ class CoupGame(object):
 
     def __init__(self, name):
         self.name = name
-        self.deck = None
         self.players = list()
         self.player_seats = {seat:None for seat in range(0, self.MAX_NUM_PLAYERS)}
         self.name_to_player = dict()
+        self.reset()
+    
+    def reset(self):
+        self.deck = None
         self._turn_player_index = None
 
         # State
         self.started = False
+        self.finished = False
         self.turn = None
 
+        for pl in self.players:
+            pl.reset()
+    
     @property
     def turn_player(self):
         return self.players[self._turn_player_index]
@@ -135,6 +142,10 @@ class CoupGame(object):
         if not self.turn_player.is_in_game():
             self._turn_player_index = (self._turn_player_index+1) % len(self.players)
         self.turn.reset_turn(self.turn_player)
+
+        if self.get_winner():
+            self.started = False
+            self.finished = True
 
         logging.info([n.name for n in self.players])
         logging.info(f'Turn {self._turn_player_index} : {self.turn_player.name}')
@@ -189,6 +200,7 @@ class CoupGame(object):
         self.player_seats[new_seat] = player
     
     def start(self):
+        self.reset()
         self.deck = CourtDeck()
         self.deck.shuffle()
         for player in self.players:
@@ -214,7 +226,7 @@ class CoupGame(object):
         assert isinstance(player, CoupGamePlayer), "Bad value for player"
         if not self.started:
             raise BadGameState(f"Game {self.name} has not started yet")
-        move_handler.apply_move_handler(self.turn, player, move, target)
+        move_handler.apply_move_handler(self.turn, self.deck, player, move, target)
         if self.turn.is_done():
             self.next_turn()
     

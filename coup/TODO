@@ -8,15 +8,16 @@ Requirements:
     - Update and broadcast game state
     - Control turns
 
-Definitions:
-Message classes:
-    - chat-msg              # Clients to clients chat messages
-    - game-msg              # From server to clients
-    - game-actions          # Action from clients
-    - game-counteractions   # Counteractions from clients to targeting client
-    - game-challenge        # Challenge from clients to other clients
-TODO: Add namedtuple for internal messages
-TODO: Add namedtuple for external messages
+Bug Fixes:
+[ ] Dead player still selectable for target
+[ ] Self player selectable as target
+[ ] Coins going negative
+[X] Lose influence selectable dead influence
+[X] Exchange cards. Need to rethink how I do influence select.
+
+Features:
+[ ] Timer bar
+[ ] Room select
 
 Frontend:
 // These are the fundamental prototype functionality I should have in order to demo the game
@@ -27,6 +28,8 @@ Frontend:
     [ ] Delete room if master
     [ ] Assign random username
 - Room
+    [X] Self player highlight
+    [X] Turn player highlight
     [X] Show player influence
     [X] Show player status (observer or player)
     [X] Player name
@@ -37,33 +40,37 @@ Frontend:
     [X] Buttons for actions/counteractions/challenge
 
 Backend:
-[ ] Define exceptions
-[ ] Proper logging suppoert
-[ ] PlayerConsumer
+[X] Define exceptions
+[X] Proper logging support
+[X] PlayerConsumer
+    [ ] Redefinition of message handling
     [X] Update game state
     [X] Send GameMessage
     [X] Send message type (by player, game msg, etc.)
     [X] Receive ChatMessage
     [X] Receive Actions
     [X] Send ChatMessage
-[ ] GameEngineConsumer
-    [ ] Create a new coup game with respect to room
-    [ ] Receive Actions
-    [ ] Each turn, we send current state of the game
-    [ ] Keep multiple games in cache; probably in a form of dict
+[X] RoomManagerConsumer
+    [X] Create a new coup game with respect to room
+    [X] Receive Actions
+    [X] Each turn, we send current state of the game
+    [X] Keep multiple games in cache; probably in a form of dict
     [X] Setup worker
-[ ] CoupGame
-    [ ] Game logic
-        [ ] Coins increment <--
-        [ ] Coup kill
-        [ ] Assassin kill
-        [ ] Ambassador exchange
+[X] CoupGame
+    [ ] Move timer
+    [X] Game logic
+        [X] Coup kill
+        [X] Ambassador exchange
+        [X] Coins increment
+        [X] Assassin kill
         [X] Influence logic at challenge (lose or exchange)
         [X] Move player to observer once both influences are dead
     [X] Player status update (influence, coin and alive/dead)
-    [X] Send game state
+    [X] Valid move getter
+    [X] Game state definitions
     [X] Action/counteraction/influence definitions
     [X] Decide on datastructure
+    [X] Define tests
 
 
 ##Messages
@@ -82,7 +89,6 @@ Server to client message structure
             'playing': true,
             'influence': ['*', '*']
             'coin': 0
-
         }
     ]
 }
@@ -94,7 +100,6 @@ Server to client message structure
     'header':' 'player-valid-moves',
     'message': ['action-income', 'action-foreign-aid', ...]
 }
-}                                                                   
 
 Client to server message structure
 There are three types of headers:

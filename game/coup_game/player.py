@@ -2,6 +2,9 @@ class CoupGamePlayer(object):
     """Entity to maintain player state in the game"""
     def __init__(self, name):
         self.name = name
+        self.reset()
+    
+    def reset(self):
         self.coins = 0
         self.owned_influence = list()  # Cards faced down
         self.lost_influence = list()   # Cards revealed
@@ -17,6 +20,11 @@ class CoupGamePlayer(object):
         self.owned_influence.remove(old)
         self.owned_influence.append(new)
         deck.put_back_and_reshuffle(old)
+    
+    def discard_card(self, card, deck):
+        assert card in self.owned_influence, f"Player does not own {card}"
+        self.owned_influence.remove(card)
+        deck.put_back_and_reshuffle(card)
 
     def lose_influence(self, influence):
         assert influence in self.owned_influence, f"Player does not own {influence}"

@@ -118,6 +118,10 @@ class RoomManagerConsumer(AsyncConsumer):
         except BadGameState as ex:
             logging.error(ex)
 
+        if game.finished:
+            winner = game.get_winner()
+            logging.info(f"Game finished. Winner: {winner.name}")
+            await self._send_chat_to_players(room, f'Game finished. Winner {winner.name} ')
         await self._send_frontend_to_players(room, game)
     
     async def game_control(self, event):
