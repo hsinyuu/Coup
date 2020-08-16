@@ -42,6 +42,7 @@ def get_challenge_result(player, challenger, challenged_move):
     return ChallengeResult(winner=challenger, loser=player, exchange_card=None)
 
 def resolve_challenge(turn, player, challenger, challenged_move):
+    turn.challenged = True
     result = get_challenge_result(player, challenger, challenged_move)
     if result.exchange_card:
         result.winner.exchange_card(result.exchange_card, turn.court_deck.draw(), turn.court_deck)
@@ -126,9 +127,17 @@ def handle_move_for_wait_lose_influence(turn, deck, player, move, target):
         raise BadPlayerMove(f"Player {player.name} should not be allowed to lose influence. " \
                                 + f"Challenge loser={turn.challenge_loser} " \
                                 + f"Target={turn.lose_influence_target} ")
-    # Update
+
+    # Lose a player influence
     player.lose_influence(target)
-    if player is turn.challenge_loser and not turn.action_applied:
+
+    # If there was a challenge and the opponent challenger lost, 
+    # action still applies after the loser loses an influence.
+    # NOTE: This does not apply if the challenger is the
+    # action player, since the action cannot be applied.
+    is_action_player = player == turn.action_player
+    is_challenge_loser = player == turn.challenge_loser
+    if not is_action_player and is_challenge_loser and not turn.action_applied:
         turn.apply_action_and_update_state()
     else:
         turn.change_state(TurnState.DONE)

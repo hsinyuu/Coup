@@ -33,6 +33,7 @@ class CoupGameTurn(object):
         self.counter_played = None
         self.counter_player = None
         # Challenge
+        self.challenged = False
         self.challenge_loser = None
         self.challenge_winner = None
         # Exchang
