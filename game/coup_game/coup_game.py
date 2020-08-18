@@ -9,7 +9,7 @@ from game.coup_game.turn.turn import CoupGameTurn
 from game.coup_game.turn.state import TurnState
 import game.coup_game.turn.move_handler as move_handler
 import game.coup_game.turn.move_factory as move_factory
-from game.coup_game.exceptions import BadGameState, NotEnoughPlayer, SeatOccupied, GameIsFull
+from game.coup_game.exceptions import BadGameState, NotEnoughPlayer, SeatOccupied, GameIsFull, BadPlayerMove
 
 """
 Call flow goes like this:
@@ -232,6 +232,8 @@ class CoupGame(object):
         assert isinstance(player, CoupGamePlayer), "Bad value for player"
         if not self.started:
             raise BadGameState(f"Game {self.name} has not started yet")
+        if isinstance(target, CoupGamePlayer) and not target.is_in_game():
+            raise BadPlayerMove(f"Player {target.name} selected as target but not in game")
         move_handler.apply_move_handler(self.turn, self.deck, player, move, target)
         logging.debug("Current turn state: {turn.state}")
         if self.turn.is_done():

@@ -83,8 +83,9 @@ class CoupGameTurn(object):
             self.change_state(TurnState.EXCHANGE_INFLUENCE)
         elif action is Actions.STEAL:
             assert target, f"Expected target for action {action}"
-            target.coins -= 2
-            player.coins += 2
+            steal_amount = min(target.coins, 2) # We can steal a max of 2 coins
+            target.coins -= steal_amount
+            player.coins += steal_amount
             self.change_state(TurnState.DONE)
         elif action is Actions.ASSASSINATE:
             assert target, f"Expected target for action {action}"

@@ -9,9 +9,10 @@ Requirements:
     - Control turns
 
 Bug Fixes:
-[ ] Dead player still selectable for target
-[ ] Self player selectable as target
-[ ] Coins going negative
+[X] Coins going negative
+[X] Dead player still selectable for target need server side verification
+[X] Dead player still selectable for target
+[X] Self player selectable as target
 [X] Lose influence selectable dead influence
 [X] Exchange cards. Need to rethink how I do influence select.
 

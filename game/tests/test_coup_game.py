@@ -1,7 +1,7 @@
 from django.test import TestCase
 from game.coup_game.coup_game import CoupGame, CoupGameFrontend
 from game.coup_game.turn.state import TurnState
-from game.coup_game.exceptions import NotEnoughPlayer
+from game.coup_game.exceptions import NotEnoughPlayer, BadPlayerMove
 from game.coup_game.move import Actions, Counteractions, GenericMove
 from game.coup_game.objects import Influence
 
@@ -26,6 +26,36 @@ class CoupGameTestCase(TestCase):
         self.assertEqual(self.game.get_player_by_name('player0').name, 'player0')
         self.assertEqual(self.game.get_player_by_name('player1').name, 'player1')
         self.assertEqual(self.game.get_player_by_name('player2').name, 'player2')
+    
+    def test_dead_player_targeted_should_raise_error(self):
+        player0 = self.game.turn_player
+        opponents = [pl for pl in self.game.players if not pl == player0]
+
+        # Force player0 cards to be both non duke. We are going to try killing off player0.
+        player0.owned_influence.pop()
+        player0.owned_influence.pop()
+        player0.owned_influence.append(Influence.CONTESSA)
+        player0.owned_influence.append(Influence.CONTESSA)
+        self.game.player_make_move(player=player0, move=Actions.TAX, target=None)
+        self.game.player_make_move(player=opponents[0], move=GenericMove.CHALLENGE, target=None)
+        self.game.player_make_move(player=player0, move=GenericMove.LOSE_INFLUENCE, target=player0.owned_influence[0])
+
+        for opp in opponents:
+            self.game.player_make_move(player=opp, move=Actions.INCOME, target=None)
+
+        self.game.player_make_move(player=player0, move=Actions.TAX, target=None)
+        self.game.player_make_move(player=opponents[0], move=GenericMove.CHALLENGE, target=None)
+        self.game.player_make_move(player=player0, move=GenericMove.LOSE_INFLUENCE, target=player0.owned_influence[0])
+        self.assertTrue(not player0.is_in_game())
+
+        # Give 3 coins to opp to do an assassinate
+        opponents[0].coins = 3
+        try:
+            self.game.player_make_move(player=opponents[0], move=Actions.ASSASSINATE, target=player0)
+        except Exception as ex:
+            self.assertIsInstance(ex, BadPlayerMove)
+        else:
+            self.assertTrue(False)
 
     def test_action_income(self):
         turn_player = self.game.turn_player
