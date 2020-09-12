@@ -1,4 +1,5 @@
 import logging
+import random
 import pprint
 import enum
 import json
@@ -6,7 +7,6 @@ from game.coup_game.objects import CourtDeck
 from game.coup_game.player import CoupGamePlayer, PlayerStatus
 from game.coup_game.move import GameMoveFactory
 from game.coup_game.turn.turn import CoupGameTurn
-from game.coup_game.turn.state import TurnState
 import game.coup_game.turn.move_handler as move_handler
 import game.coup_game.turn.move_factory as move_factory
 from game.coup_game.exceptions import BadGameState, NotEnoughPlayer, SeatOccupied, GameIsFull, BadPlayerMove
@@ -86,15 +86,19 @@ class CoupGameFrontend(object):
         assert isinstance(player, CoupGamePlayer), 'Bad value for player'
         # Get valid moves for player
         if not game.started:
-            return []
+            return {
+                'valid_moves': [],
+                'time': None
+            }
 
         interface = dict()
         player_valid_moves = game.get_valid_moves_for_player(player)
         player_valid_moves_serialized = list()
-        for move in player_valid_moves:
-            player_valid_moves_serialized.append(move.value)
-        return player_valid_moves_serialized
-
+        return {
+            'valid_moves': [move.value for move in player_valid_moves],
+            'time': game.get_move_timeout() if player_valid_moves else None
+        }
+    
 class CoupGame(object):
     MAX_NUM_PLAYERS = 6
 
@@ -139,13 +143,13 @@ class CoupGame(object):
     
     def next_turn(self):
         """Reset game state and update turn player to the next player in order"""
-        found_player = False
+        player_still_playing = False
         for i in range(len(self.players)):
             self._turn_player_index = (self._turn_player_index+1) % len(self.players)
             if self.turn_player.is_in_game():
-                found_player = True
+                player_still_playing = True
                 break
-        if not found_player:
+        if not player_still_playing:
             raise BadGameState("Cannot find in game player for the next turn")
         self.turn.reset_turn(self.turn_player)
 
@@ -228,16 +232,43 @@ class CoupGame(object):
         logging.info(f"player {player.name}, owned influence {player.owned_influence}, challenged move {challenged_move} lost")
         return player
     
+    def make_default_moves(self):
+        """Keep making default moves for players until the turn is reset"""
+        MAX_ITER_FOR_INFINITE_LOOP = 3
+        for iter in range(MAX_ITER_FOR_INFINITE_LOOP):
+            players_to_make_move = [player for player in self.players if self.get_valid_moves_for_player(player)]
+            for player in players_to_make_move:
+                if self.make_default_move_for_player(player):
+                    return
+
+    def make_default_move_for_player(self, player):
+        move_tuple = move_factory.get_default_move_target_tuple_for_player(self.turn, player)
+        if not move_tuple:
+            return self.turn.is_done()
+        default_move, default_target = move_tuple
+        logging.info(f"Player {player} {player.get_detail_in_str()}")
+        return self.player_make_move(player, default_move, default_target)
+    
+    def get_move_timeout(self):
+        if self.started:
+            return 3
+        else:
+            return None
+    
     def player_make_move(self, player, move, target=None):
+        """Update turn state with player move and target.
+        Returns True if the turn is done and has been reset."""
         assert isinstance(player, CoupGamePlayer), "Bad value for player"
         if not self.started:
             raise BadGameState(f"Game {self.name} has not started yet")
         if isinstance(target, CoupGamePlayer) and not target.is_in_game():
             raise BadPlayerMove(f"Player {target.name} selected as target but not in game")
         move_handler.apply_move_handler(self.turn, self.deck, player, move, target)
-        logging.debug("Current turn state: {turn.state}")
+        logging.info(f"Current turn state: {self.turn.state}")
         if self.turn.is_done():
             self.next_turn()
+            return True
+        return False
     
     def get_valid_moves_for_player(self, player):
         return move_factory.get_move_for_player(self.turn, player)

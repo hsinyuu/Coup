@@ -38,6 +38,9 @@ class CoupGamePlayer(object):
 
     def is_in_game(self):
         return self.status is PlayerStatus.IN_GAME
+    
+    def get_detail_in_str(self):
+        return f"{self.name} coins={self.coins} status={self.status} owned_influence={self.owned_influence} lost_influence={self.lost_influence}"
 
     def __str__(self):
         return self.name

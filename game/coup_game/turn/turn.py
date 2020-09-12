@@ -23,6 +23,8 @@ class CoupGameTurn(object):
     def reset_turn(self, turn_player):
         self.state = TurnState.ACTION
         self.change_same_state_cnt= 0
+
+        ### Define state variables
         # Action
         self.action_player = turn_player
         self.action_played = None

@@ -25,7 +25,10 @@ Room
         <div class='col-8 border' style='height:400px'>
             <div class='row' style='height:300px;' id='game-view'>
             </div>
-            <div class='row border' style='height:100px;' id='player-view'>
+            <div class="progress" id="timebar-wrap" hidden>
+                <div class="progress-bar" id='timebar' style="width:1%;" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class='row border' style='height:95px;' id='player-view'>
             </div>
         </div>
     </div>
@@ -121,6 +124,37 @@ Room
         const move = elem.id;
         $('.select-target').html(move);
         $('.select-target').prop('hidden', false);
+    };
+
+    var intervalTimer = null;
+    const startTimeBar = (totalDurationInSec) => {
+        const INCR_INTERVAL_IN_MILLISEC = 100;
+        const MILLISEC_TO_SEC_FACTOR = 1/1000.;
+        var nowDurationInSec= 0;
+        intervalTimer = setInterval(
+            () => {
+                nowDurationInSec += INCR_INTERVAL_IN_MILLISEC*MILLISEC_TO_SEC_FACTOR;
+                percentage = 100.*nowDurationInSec/totalDurationInSec;
+                $('#timebar-wrap').prop('hidden', false);
+                $('#timebar').css('width', percentage + '%');
+                $('#timebar').attr('aria-valuenow', nowDurationInSec);
+                if (nowDurationInSec >= totalDurationInSec) {
+                    if (intervalTimer == null) { console.error("Attempting to stop interval timer but no interval timer set")
+                    }
+                    clearInterval(intervalTimer);
+                    $('#timebar').prop('hidden', true);
+                    $('#timebar-wrap').prop('hidden', true);
+                }
+            }, INCR_INTERVAL_IN_MILLISEC
+        ) 
+    };
+
+    const resetTimeBar= () => {
+        clearInterval(intervalTimer);
+        $('#timebar-wrap').prop('hidden', true);
+        $('#timebar').css('width', '0%');
+        $('#timebar').attr('aria-valuenow', 0);
+        intervalTimer = null;
     }
 
     const sendMoveWithTarget = (elem, target) => {
@@ -321,13 +355,23 @@ Room
             "<div style='width:100px'>" +
             "coins: " + coins +
             "</div>" +
-            cardsComponent
-    }
-
-    const updateInterface = (interfaceArray) => {
-        disableButtonArray(gameplayButtons);
-        enableButtonArray(interfaceArray);
+            cardsComponent;
     };
+
+    const updateInterface = (interface) => {
+        const {valid_moves, time} = interface;
+        console.log(interface);
+        console.log('time ' + time);
+        console.log('valid_moves ' + valid_moves)
+        disableButtonArray(gameplayButtons);
+        enableButtonArray(valid_moves);
+        resetTimeBar();
+        if (time != null) {
+            startTimeBar(time);
+        }
+        
+    };
+
 
 </script>
 

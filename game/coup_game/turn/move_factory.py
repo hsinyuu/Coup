@@ -29,6 +29,25 @@ def get_move_for_player(turn, player):
     except KeyError as ex:
         logging.error(f"Error: Handler does not exist for state {turn.state}")
 
+def get_default_move_target_tuple_for_player(turn, player):
+    """Returns a tuple of default move and target for the given player"""
+    valid_moves = get_move_for_player(turn, player)
+    if not valid_moves:
+        return None
+    if Actions.INCOME in valid_moves:
+        return (Actions.INCOME, None)
+    if Actions.COUP in valid_moves:
+        opponents = [pl for pl in turn.players if pl != player]
+        return (Actions.COUP, opponents[0])
+    if GenericMove.LOSE_INFLUENCE in valid_moves:
+        assert player.owned_influence, f"Attempt to lose influence but player {player} has no influence"
+        return (GenericMove.LOSE_INFLUENCE, player.owned_influence[0])
+    if GenericMove.DISCARD_INFLUENCE in valid_moves:
+        assert player.owned_influence, f"Attempt to discard influence but player {player} has no influence"
+        return (GenericMove.DISCARD_INFLUENCE, player.owned_influence[0])
+    logging.warning("Unexpected case while making default move")
+    return (valid_moves[0], None)
+
 # Move factory definition
 @register_move_getter
 def get_move_for_wait_action(turn, player):
@@ -101,6 +120,10 @@ class GameMoveFactory(object):
     @classmethod
     def actions_from_coins(cls, coins):
         """Get doable actions given the number of coins"""
+        # Can only use coup if the player has 10 or above num coins
+        if coins >= 10:
+            return [Actions.COUP]
+
         doable_actions = [Actions.INCOME, Actions.FOREIGN_AID, Actions.EXCHANGE, Actions.STEAL, Actions.TAX]
         if coins >= 3:
             doable_actions.append(Actions.ASSASSINATE)

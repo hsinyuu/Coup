@@ -1,5 +1,7 @@
 import logging
 import json
+from asgiref.sync import async_to_sync
+from threading import Timer
 from channels.layers import get_channel_layer
 from channels.consumer import AsyncConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -14,6 +16,7 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         self.room_name = self.scope['url_route']['kwargs']['room_name']
         self.player_name = self.scope['user'].username
         self.channel_layer_sender = ChannelLayerMessageSender(self.channel_layer)
+        self.move_timeout_timer = None
 
         await self.channel_layer.group_add(self.room_name, self.channel_name)
         await self.channel_layer_sender.send_to_consumer('room-manager', 
@@ -69,7 +72,7 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         player_event = event[self.player_name]
         player_event['type'] = 'frontend.update'
         await self.send(text_data=serializers.data_to_text_data(player_event))
-    
+
 import enum
 class Control(enum.Enum):
     START_GAME = 'start.game'
@@ -87,6 +90,7 @@ class RoomManagerConsumer(AsyncConsumer):
     def __init__(self, *args, **kwargs):
         super(RoomManagerConsumer,self).__init__(*args, **kwargs)
         self.games = dict()     # Current ongoing games by room id
+        self.move_timeout = dict()
         self.channel_layer_sender= ChannelLayerMessageSender(get_channel_layer())
         self.coup_frontend = CoupGameFrontend()
         logging.info('Room manager initialized')
@@ -104,6 +108,9 @@ class RoomManagerConsumer(AsyncConsumer):
 
         room = event.get('room')
         game = self.games[room]
+
+        # Clear internal move timer
+        self.clear_move_timer(room)
 
         # Convert string to objects
         move = str_to_move(event.get('move'))
@@ -123,7 +130,8 @@ class RoomManagerConsumer(AsyncConsumer):
             logging.info(f"Game finished. Winner: {winner.name}")
             await self._send_chat_to_players(room, f'Game finished. Winner {winner.name} ')
         await self._send_frontend_to_players(room, game)
-    
+        self.start_move_timer_if_exist(room, game)
+
     async def game_control(self, event):
         # Process event
         room = event.get('room')
@@ -134,6 +142,7 @@ class RoomManagerConsumer(AsyncConsumer):
             player = game.get_player_by_name(event.get('player'))
             seat = event.get('value')
             game.player_change_seat(player, seat)
+        self.start_move_timer_if_exist(room, game)
         await self._send_frontend_to_players(room, game)
     
     async def join_game(self, event):
@@ -142,7 +151,6 @@ class RoomManagerConsumer(AsyncConsumer):
         if not room in self.games:
             self.games[room] = CoupGame(room)
         game = self.games[room]
-
         player_obj = game.add_player(player)
 
         # Send chat message to clients to inform new player join
@@ -172,6 +180,27 @@ class RoomManagerConsumer(AsyncConsumer):
                 'player_view': self.coup_frontend.player_view(game, player)
             }
         await self.channel_layer_sender.broadcast_to_group(room, individual_update)
+
+    @async_to_sync
+    async def make_default_move_and_update(self, room, game):
+        logging.info("------ DEFAULT_MOVE")
+        game.make_default_moves()
+        await self._send_frontend_to_players(room, game)
+        self.clear_move_timer(room)
+        self.start_move_timer_if_exist(room, game)
+    
+    def start_move_timer_if_exist(self, room, game):
+        dur = game.get_move_timeout()
+        if dur:
+            self.move_timeout[room] = Timer(dur, self.make_default_move_and_update, [room, game])
+            self.move_timeout[room].start()
+            logging.info('Timer started')
+    
+    def clear_move_timer(self, room):
+        if self.move_timeout[room]:
+            self.move_timeout[room].cancel()
+            self.move_timeout[room] = None
+            logging.info("Timer cleared")
             
 class ChannelLayerMessageSender(object):
     def __init__(self, channel_layer):
