@@ -2,9 +2,11 @@ import logging
 import json
 from asgiref.sync import async_to_sync
 from threading import Timer
+from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from channels.consumer import AsyncConsumer
 from channels.generic.websocket import AsyncWebsocketConsumer
+from game.models import Room
 from game.coup_game.coup_game import CoupGame, CoupGameFrontend
 from game.coup_game.move import str_to_move
 from game.coup_game.objects import str_to_inf
@@ -93,7 +95,9 @@ class RoomManagerConsumer(AsyncConsumer):
         self.move_timeout = dict()
         self.channel_layer_sender= ChannelLayerMessageSender(get_channel_layer())
         self.coup_frontend = CoupGameFrontend()
+        self.db_interface = RoomManagerToDBInterface()
         logging.info('Room manager initialized')
+   
     
     async def game_move(self, event):
         def target_str_to_obj(target):
@@ -138,6 +142,7 @@ class RoomManagerConsumer(AsyncConsumer):
         game = self.games[room]
         if event.get('control') == 'start-game':
             game.start()
+            await self.db_interface.update_room(room, game.get_num_players(), game.started)
         elif event.get('control') == 'change-seat':
             player = game.get_player_by_name(event.get('player'))
             seat = event.get('value')
@@ -150,6 +155,7 @@ class RoomManagerConsumer(AsyncConsumer):
         room = event.get('room')
         if not room in self.games:
             self.games[room] = CoupGame(room)
+            await self.db_interface.add_room(room)
         game = self.games[room]
         player_obj = game.add_player(player)
 
@@ -159,6 +165,7 @@ class RoomManagerConsumer(AsyncConsumer):
         else:
             await self._send_chat_to_players(room, f'{player} has re-joined the room')
         await self._send_frontend_to_players(room, game)
+        await self.db_interface.update_room(room, game.get_num_players(), game.started)
 
     async def _send_chat_to_players(self, room, message):
         await self.channel_layer_sender.broadcast_to_group(room, {
@@ -213,3 +220,38 @@ class ChannelLayerMessageSender(object):
     async def send_to_consumer(self, consumer_name, data):
         logging.debug(f'Sending to consumer {consumer_name} : {data}')
         await self._channel_layer.send(consumer_name, data)
+
+class RoomManagerToDBInterface(object):
+    def __init__(self):
+        pass
+
+    @database_sync_to_async
+    def add_room(self, room_name):
+        """Create a room entry in database.
+        Returns True if successful, False otherwise"""
+        try:
+            new_room = Room(name=room_name, password="", num_players=1, game_started=False)
+            new_room.save()
+        except Exception as ex:
+            logging.error(f"Error occured while trying to create new room: {ex}")
+            return False
+        return True
+
+    @database_sync_to_async
+    def update_room(self, room_name, num_players, game_started):
+        """Update the fields of the room with the same name as given in the database
+        Returns True if successful, False otherwise"""
+        room_queryset = Room.objects.filter(name=room_name)
+        if not room_queryset:
+            logging.error(f"Room {room_name} not found while attempting to update database")
+            return
+        room = room_queryset[0]
+        room.name = room_name
+        room.num_players = num_players
+        room.game_started = game_started
+        try:
+            room.save()
+        except Exception as ex:
+            logging.error(f"Error occured while trying to update room detail: {ex}")
+            return False
+        return True

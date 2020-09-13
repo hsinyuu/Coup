@@ -120,7 +120,7 @@ class CoupGame(object):
 
         for pl in self.players:
             pl.reset()
-    
+
     @property
     def turn_player(self):
         return self.players[self._turn_player_index]

@@ -71,8 +71,13 @@
             })
     }
 
-    const generateHTMLRoomElement = (roomName) => {
+    const generateHTMLRoomElement = (roomName, numPlayers, gameStarted) => {
+        gameStartedStatusSpanDOM = "<span class='badge badge-success'>Waiting</span>"
+        if (gameStarted)
+            gameStartedStatusSpanDOM = "<span class='badge badge-danger'>Started</span>"
         return "<div id=" + roomName + " class='row border rounded col-12 mx-auto py-2'>" +
+            gameStartedStatusSpanDOM +
+            "<span class='badge badge badge-light'>" + numPlayers + "/6</span>" +
             roomName +
             "<div class='ml-auto'>" +
             "<a href='http://127.0.0.1:8000/room/" + roomName + "' class='btn btn-primary btn-sm' role='button'>Join</a>" +
@@ -86,10 +91,11 @@
         roomListJsonData.forEach((roomDetail) => {
             const {
                 name,
-                game_started,
-                num_players
+                num_players,
+                game_started
             } = roomDetail;
-            roomListHTML += generateHTMLRoomElement(name);
+            console.log(roomDetail);
+            roomListHTML += generateHTMLRoomElement(name, num_players, game_started);
         });
         const roomListHTMLDOM = document.getElementById('room-list')
         roomListHTMLDOM.innerHTML = roomListHTML;
