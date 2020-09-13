@@ -9,10 +9,13 @@ from game.serializers import RoomSerializer
 from game.models import Room
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from game.forms import RoomForm
 
 def lobby_view(request):
+    form = RoomForm()
     context = {
-        'room_name_list': ['room0', 'room1']
+        'room_name_list': ['room0', 'room1'],
+        'form': form
     }
     return render(request, 'game/pages/lobby.html', context=context)
 

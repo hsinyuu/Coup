@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'game',
     'channels',
     'rest_framework',
+    'crispy_forms',
     'django_nose',
     'django.contrib.admin',
     'django.contrib.auth',

@@ -8,54 +8,94 @@
     - Delete room if master
     - Assign random username
 -->
+{% load crispy_forms_tags %}
 
 
+<div class="modal fade" id="createModal" tabindex="-1" role="dialog" aria-labelledby="createRoomModalLabel"
+    aria-hidden="true">
+    <form class="form" mdethod="post">
+        {% csrf_token %}
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createModalTitle">Create a room</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group mb-2">
+                        {{ form.name|as_crispy_field }}
+                    </div>
+                    <div class="form-group mb-2">
+                        {{ form.password|as_crispy_field }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
 
 <div class='container py-3'>
-<div class='row'>
-    <div class='col-md-2 mr-auto'>
-        <Button class='btn btn-warning btn-sm'>Create Room</Button>
+    <div class='row'>
+        <div class='col-md-2 mr-auto'>
+            <Button class='btn btn-warning btn-sm' data-toggle='modal' data-target="#createModal">Create Room</Button>
+        </div>
+        <div class='col-md-2 ml-auto'>
+            <h3 id='user-name'>{{user.get_username}}</h3>
+        </div>
     </div>
-    <div class='col-md-2 ml-auto'>
-        <h3 id='user-name'>{{user.get_username}}</h3>
+    <div class='row' id='room-list'>
     </div>
-</div>
-<div class='row' id='room-list'>
-</div>
 </div>
 <script>
-const fetchRoomList = (callback) => {
-    fetch("http://127.0.0.1:8000/api/rooms")
-        .then((resp) => { if (resp.status !== 200) return Promise.reject(new Error(resp.statusText)); return resp;})
-        .then((resp) => { return resp.json(); })
-        .then((data) => { console.log('Request succeeded with JSON response', data); callback(data); })
-        .catch((err) => { console.log('Fetch error :-S', err); })
-}
+    const fetchRoomList = (callback) => {
+        fetch("http://127.0.0.1:8000/api/rooms")
+            .then((resp) => {
+                if (resp.status !== 200) return Promise.reject(new Error(resp.statusText));
+                return resp;
+            })
+            .then((resp) => {
+                return resp.json();
+            })
+            .then((data) => {
+                console.log('Request succeeded with JSON response', data);
+                callback(data);
+            })
+            .catch((err) => {
+                console.log('Fetch error :-S', err);
+            })
+    }
 
-const generateHTMLRoomElement = (roomName) => {
-    return "<div id=" + roomName + " class='row border rounded col-12 mx-auto py-2'>" 
-            + roomName
-            + "<div class='ml-auto'>"
-            + "<Button class='btn btn-primary btn-sm'>Join</Button>"
-            + "<Button class='btn btn-danger btn-sm'>Remove</Button>"
-            + "</div>"
-            + "</div>"
-}
+    const generateHTMLRoomElement = (roomName) => {
+        return "<div id=" + roomName + " class='row border rounded col-12 mx-auto py-2'>" +
+            roomName +
+            "<div class='ml-auto'>" +
+            "<a href='http://127.0.0.1:8000/room/" + roomName + "' class='btn btn-primary btn-sm' role='button'>Join</a>" +
+            "<Button class='btn btn-danger btn-sm'>Remove</Button>" +
+            "</div>" +
+            "</div>"
+    }
 
-const updateRoomListComponentFetchCallback = (roomListJsonData) => {
-    let roomListHTML = "";
-    roomListJsonData.forEach((roomDetail) => {
-        const {name, game_started, num_players} = roomDetail;
-        roomListHTML += generateHTMLRoomElement(name);
-    });
-    const roomListHTMLDOM = document.getElementById('room-list')
-    roomListHTMLDOM.innerHTML = roomListHTML;
+    const updateRoomListComponentFetchCallback = (roomListJsonData) => {
+        let roomListHTML = "";
+        roomListJsonData.forEach((roomDetail) => {
+            const {
+                name,
+                game_started,
+                num_players
+            } = roomDetail;
+            roomListHTML += generateHTMLRoomElement(name);
+        });
+        const roomListHTMLDOM = document.getElementById('room-list')
+        roomListHTMLDOM.innerHTML = roomListHTML;
 
-}
-fetchRoomList(updateRoomListComponentFetchCallback);
-
-
-
+    }
+    fetchRoomList(updateRoomListComponentFetchCallback);
 </script>
 
 
