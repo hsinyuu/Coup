@@ -16,17 +16,13 @@ Bug Fixes:
 [X] Lose influence selectable dead influence
 [X] Exchange cards. Need to rethink how I do influence select.
 
-Features:
-[ ] Room select
-
 Frontend:
 // These are the fundamental prototype functionality I should have in order to demo the game
 - Lobby
-    [ ] List of rooms
+    [X] List of rooms
     [ ] Create room
     [ ] Join room
-    [ ] Delete room if master
-    [ ] Assign random username
+    [ ] Delete room
 - Room
     [X] Self player highlight
     [X] Turn player highlight
@@ -41,6 +37,11 @@ Frontend:
     [X] Frontend timebar
 
 Backend:
+[ ] Lobby
+    [ ] Create room handling
+    [ ] Delete if owner
+    [ ] Consumer update new room in db
+    [ ] Consumer update number of players in db
 [X] Define exceptions
 [X] Proper logging support
 [X] PlayerConsumer

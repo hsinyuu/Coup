@@ -10,23 +10,50 @@
 -->
 
 
+
 <div class='container py-3'>
+<div class='row'>
+    <div class='col-md-2 mr-auto'>
+        <Button class='btn btn-warning btn-sm'>Create Room</Button>
+    </div>
+    <div class='col-md-2 ml-auto'>
+        <h3 id='user-name'>{{user.get_username}}</h3>
+    </div>
+</div>
 <div class='row' id='room-list'>
 </div>
 </div>
-
 <script>
+const fetchRoomList = (callback) => {
+    fetch("http://127.0.0.1:8000/api/rooms")
+        .then((resp) => { if (resp.status !== 200) return Promise.reject(new Error(resp.statusText)); return resp;})
+        .then((resp) => { return resp.json(); })
+        .then((data) => { console.log('Request succeeded with JSON response', data); callback(data); })
+        .catch((err) => { console.log('Fetch error :-S', err); })
+}
 
-const getFormatedRoom = (roomName) => {
-    return "<div class='border rounded col-12 mx-auto py-2'>" 
+const generateHTMLRoomElement = (roomName) => {
+    return "<div id=" + roomName + " class='row border rounded col-12 mx-auto py-2'>" 
             + roomName
+            + "<div class='ml-auto'>"
             + "<Button class='btn btn-primary btn-sm'>Join</Button>"
             + "<Button class='btn btn-danger btn-sm'>Remove</Button>"
             + "</div>"
+            + "</div>"
 }
 
-const roomListElement = document.getElementById('room-list')
-roomListElement.innerHTML = getFormatedRoom('test')
+const updateRoomListComponentFetchCallback = (roomListJsonData) => {
+    let roomListHTML = "";
+    roomListJsonData.forEach((roomDetail) => {
+        const {name, game_started, num_players} = roomDetail;
+        roomListHTML += generateHTMLRoomElement(name);
+    });
+    const roomListHTMLDOM = document.getElementById('room-list')
+    roomListHTMLDOM.innerHTML = roomListHTML;
+
+}
+fetchRoomList(updateRoomListComponentFetchCallback);
+
 
 
 </script>

@@ -15,7 +15,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from game.views import test_view, lobby_view, room_view
+from game.views import test_view, lobby_view, room_view, RoomListView, RoomCreateView
+import game.views as views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,5 +24,8 @@ urlpatterns = [
     path('', lobby_view),       #TODO
     path('accounts/', include('django.contrib.auth.urls')),
     path('lobby/', lobby_view), #TODO
-    path('room/<slug:room_name>', room_view)    #TODO
+    path('room/<slug:room_name>', room_view),    #TODO
+    path('api/rooms/', views.RoomListView.as_view()),
+    path('api/rooms-detail/<slug:name>', views.RoomDetailView.as_view()),
+    path('api/rooms-create/', views.RoomCreateView.as_view()),
 ]
