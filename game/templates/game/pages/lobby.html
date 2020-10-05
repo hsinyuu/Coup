@@ -52,9 +52,14 @@
     <div class='row' id='room-list'>
     </div>
 </div>
+
+{% csrf_token %}
 <script>
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    //hostname = "http://192.168.0.15:8000";
+    hostname = "http://127.0.0.1:8000";
     const fetchRoomList = (callback) => {
-        fetch("http://127.0.0.1:8000/api/rooms")
+        fetch(hostname + "/api/rooms")
             .then((resp) => {
                 if (resp.status !== 200) return Promise.reject(new Error(resp.statusText));
                 return resp;
@@ -75,15 +80,29 @@
         gameStartedStatusSpanDOM = "<span class='badge badge-success'>Waiting</span>"
         if (gameStarted)
             gameStartedStatusSpanDOM = "<span class='badge badge-danger'>Started</span>"
-        return "<div id=" + roomName + " class='row border rounded col-12 mx-auto py-2'>" +
+        return "<div class='row border rounded col-12 mx-auto py-2'>" +
             gameStartedStatusSpanDOM +
             "<span class='badge badge badge-light'>" + numPlayers + "/6</span>" +
             roomName +
             "<div class='ml-auto'>" +
-            "<a href='http://127.0.0.1:8000/room/" + roomName + "' class='btn btn-primary btn-sm' role='button'>Join</a>" +
-            "<Button class='btn btn-danger btn-sm'>Remove</Button>" +
+            "<a href='" + hostname + "room/" + roomName + "' class='btn btn-primary btn-sm' role='button'>Join</a>" +
+            "<Button class='btn btn-danger btn-sm' id='"+ roomName + "' onclick='sendRemoveRoomRequest(event)'>Remove</Button>" +
             "</div>" +
             "</div>"
+    }
+
+    const sendRemoveRoomRequest = (event) => {
+        console.log(event.target)
+        console.log(csrftoken)
+        roomName = event.target.id
+        requestUrl = hostname+'/api/rooms-delete/'+roomName
+        console.log(requestUrl)
+        fetch(requestUrl, {
+              method: 'DELETE',
+              headers: {'X-CSRFToken': csrftoken}
+            })
+            .then(res => res.text()) // or res.json()
+            .then(res => console.log(res))
     }
 
     const updateRoomListComponentFetchCallback = (roomListJsonData) => {

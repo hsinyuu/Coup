@@ -28,6 +28,10 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         logging.info(f'Joined {self.player_name}')
 
     async def disconnect(self, close_code):
+        print('disconnect')
+        await self.channel_layer_sender.send_to_consumer('room-manager', 
+            {'type': 'disconnect.from.game', 'player':self.player_name, 'room': self.room_name}
+        )
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
     async def receive(self, text_data):
@@ -48,16 +52,6 @@ class PlayerConsumer(AsyncWebsocketConsumer):
                 await self.send(text_data=json.dumps(resp))
                 logging.error(f'Error: Serializered data is not valid. {serializer.errors}')
     
-    async def _process_or_propagate_message(self, validated_data):
-        event_type = serializers.EventType(validated_data['type'])
-        if event_type is serializers.EventType.CHAT:
-            await self.channel_layer_sender.broadcast_to_group(self.room_name, validated_data)
-        elif event_type in (serializers.EventType.GAME_MOVE, serializers.EventType.GAME_CONTROL):
-            validated_data['room'] = self.room_name
-            await self.channel_layer_sender.send_to_consumer('room-manager', validated_data)
-        else:
-            logging.error(f'Received unexpected event type {event_type} data {validated_data}')
-    
     async def chat(self, event):
         await self.send(text_data=serializers.data_to_text_data(event))
     
@@ -74,6 +68,17 @@ class PlayerConsumer(AsyncWebsocketConsumer):
         player_event = event[self.player_name]
         player_event['type'] = 'frontend.update'
         await self.send(text_data=serializers.data_to_text_data(player_event))
+
+    async def _process_or_propagate_message(self, validated_data):
+        event_type = serializers.EventType(validated_data['type'])
+        if event_type is serializers.EventType.CHAT:
+            await self.channel_layer_sender.broadcast_to_group(self.room_name, validated_data)
+        elif event_type in (serializers.EventType.GAME_MOVE, serializers.EventType.GAME_CONTROL):
+            validated_data['room'] = self.room_name
+            await self.channel_layer_sender.send_to_consumer('room-manager', validated_data)
+        else:
+            logging.error(f'Received unexpected event type {event_type} data {validated_data}')
+    
 
 import enum
 class Control(enum.Enum):
@@ -96,8 +101,8 @@ class RoomManagerConsumer(AsyncConsumer):
         self.channel_layer_sender= ChannelLayerMessageSender(get_channel_layer())
         self.coup_frontend = CoupGameFrontend()
         self.db_interface = RoomManagerToDBInterface()
+
         logging.info('Room manager initialized')
-   
     
     async def game_move(self, event):
         def target_str_to_obj(target):
@@ -128,6 +133,10 @@ class RoomManagerConsumer(AsyncConsumer):
             logging.error(ex)
         except BadGameState as ex:
             logging.error(ex)
+        if target:
+            await self._send_chat_to_players(room, f'{player} used {move} on {target}')
+        else:
+            await self._send_chat_to_players(room, f'{player} used {move}')
 
         if game.finished:
             winner = game.get_winner()
@@ -150,6 +159,22 @@ class RoomManagerConsumer(AsyncConsumer):
         self.start_move_timer_if_exist(room, game)
         await self._send_frontend_to_players(room, game)
     
+    async def disconnect_from_game(self, event):
+        """Remove disconnected player from the corresponding game.
+        If no player left in the game, remove the game entirely."""
+        room = event.get('room')
+        game = self.games[room]
+        if not game.started:
+            game.remove_player(event.get('player'))
+            if game.is_empty():
+                await self.db_interface.delete_room(room)
+                del self.games[room]
+            else:
+                await self._send_chat_to_players(room, f"{event.get('player')} has left the room")
+                await self._send_frontend_to_players(room, game)
+                await self.db_interface.update_room(room, game.get_num_players(), game.started)
+            logging.info(f"Removed player {event.get('player')} from game {room}")
+    
     async def join_game(self, event):
         player = event.get('player')
         room = event.get('room')
@@ -157,15 +182,33 @@ class RoomManagerConsumer(AsyncConsumer):
             self.games[room] = CoupGame(room)
             await self.db_interface.add_room(room)
         game = self.games[room]
-        player_obj = game.add_player(player)
+        game.add_player(player)
 
         # Send chat message to clients to inform new player join
-        if player_obj:
-            await self._send_chat_to_players(room, f'{player} has joined the room')
-        else:
-            await self._send_chat_to_players(room, f'{player} has re-joined the room')
+        await self._send_chat_to_players(room, f'{player} has joined the room')
         await self._send_frontend_to_players(room, game)
         await self.db_interface.update_room(room, game.get_num_players(), game.started)
+
+    @async_to_sync
+    async def make_default_move_and_update(self, room, game):
+        logging.info("------ DEFAULT_MOVE")
+        game.make_default_moves()
+        await self._send_frontend_to_players(room, game)
+        self.clear_move_timer(room)
+        self.start_move_timer_if_exist(room, game)
+    
+    def start_move_timer_if_exist(self, room, game):
+        dur = game.get_move_timeout()
+        if dur:
+            self.move_timeout[room] = Timer(dur, self.make_default_move_and_update, [room, game])
+            self.move_timeout[room].start()
+            logging.info('Timer started')
+    
+    def clear_move_timer(self, room):
+        if self.move_timeout[room]:
+            self.move_timeout[room].cancel()
+            self.move_timeout[room] = None
+            logging.info("Timer cleared")
 
     async def _send_chat_to_players(self, room, message):
         await self.channel_layer_sender.broadcast_to_group(room, {
@@ -188,26 +231,6 @@ class RoomManagerConsumer(AsyncConsumer):
             }
         await self.channel_layer_sender.broadcast_to_group(room, individual_update)
 
-    @async_to_sync
-    async def make_default_move_and_update(self, room, game):
-        logging.info("------ DEFAULT_MOVE")
-        game.make_default_moves()
-        await self._send_frontend_to_players(room, game)
-        self.clear_move_timer(room)
-        self.start_move_timer_if_exist(room, game)
-    
-    def start_move_timer_if_exist(self, room, game):
-        dur = game.get_move_timeout()
-        if dur:
-            self.move_timeout[room] = Timer(dur, self.make_default_move_and_update, [room, game])
-            self.move_timeout[room].start()
-            logging.info('Timer started')
-    
-    def clear_move_timer(self, room):
-        if self.move_timeout[room]:
-            self.move_timeout[room].cancel()
-            self.move_timeout[room] = None
-            logging.info("Timer cleared")
             
 class ChannelLayerMessageSender(object):
     def __init__(self, channel_layer):
@@ -224,6 +247,10 @@ class ChannelLayerMessageSender(object):
 class RoomManagerToDBInterface(object):
     def __init__(self):
         pass
+
+    @database_sync_to_async
+    def load_all_rooms(self):
+        return [q.name for q in Room.objects.all()]
 
     @database_sync_to_async
     def add_room(self, room_name):
@@ -245,6 +272,7 @@ class RoomManagerToDBInterface(object):
         if not room_queryset:
             logging.error(f"Room {room_name} not found while attempting to update database")
             return
+        assert (len(room_queryset) == 1), "Encountered room with same name"
         room = room_queryset[0]
         room.name = room_name
         room.num_players = num_players
@@ -254,4 +282,18 @@ class RoomManagerToDBInterface(object):
         except Exception as ex:
             logging.error(f"Error occured while trying to update room detail: {ex}")
             return False
+        return True
+    
+    @database_sync_to_async
+    def delete_room(self, room_name):
+        """Remove the room entry from the database
+        Returns True if successful, False otherwise"""
+        room_queryset = Room.objects.filter(name=room_name)
+        if len(room_queryset) == 0:
+            logging.error(f"Room {room_name} not found in attempt to delete entry from database")
+            return False
+        if len(room_queryset) > 1:
+            logging.error(f"Multiple rooms with name: {room_name} found")
+            return False
+        room_queryset[0].delete()
         return True

@@ -212,6 +212,8 @@ Room
         const data = JSON.parse(e.data);
         if (data.type == "chat") {
             document.querySelector('#message-log').innerHTML += '<div>' + data.player + ": " + data.message + '</div>';
+            messageLogElem = document.getElementById("message-log");
+            messageLogElem.scrollTop = messageLogElem.scrollHeight;
         } else if (data.type == "frontend.update") {
             const {game_view, player_view, interface} = data;
             if (game_view != undefined)

@@ -28,4 +28,5 @@ urlpatterns = [
     path('api/rooms/', views.RoomListView.as_view()),
     path('api/rooms-detail/<slug:name>', views.RoomDetailView.as_view()),
     path('api/rooms-create/', views.RoomCreateView.as_view()),
+    path('api/rooms-delete/<slug:name>', views.RoomDeleteView.as_view()),
 ]

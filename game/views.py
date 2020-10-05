@@ -3,7 +3,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
-from rest_framework.generics import ListAPIView, CreateAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView, RetrieveAPIView, DestroyAPIView
 from rest_framework.response import Response
 from game.serializers import RoomSerializer
 from game.models import Room
@@ -59,3 +59,14 @@ class RoomCreateView(CreateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+
+class RoomDeleteView(DestroyAPIView):
+    lookup_field = "name"
+    permission_classes = [IsAuthenticated]
+    queryset = Room.objects.all()
+    serializer_class = RoomSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response('deleted')

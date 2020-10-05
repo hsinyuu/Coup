@@ -27,6 +27,12 @@ class CoupGameTestCase(TestCase):
         self.assertEqual(self.game.get_player_by_name('player1').name, 'player1')
         self.assertEqual(self.game.get_player_by_name('player2').name, 'player2')
     
+    def test_remove_player(self):
+        num_players_before_insert = self.game.get_num_players()
+        self.game.add_player('player3')
+        self.game.remove_player('player3')
+        self.assertEqual(self.game.get_num_players(), num_players_before_insert)
+    
     def test_dead_player_targeted_should_raise_error(self):
         player0 = self.game.turn_player
         opponents = [pl for pl in self.game.players if not pl == player0]
@@ -447,7 +453,7 @@ class FrontendTestCase(TestCase):
             ])
 
         for player in game.players:
-            interface = self.fe.player_interface(game, player)
+            interface = self.fe.player_interface(game, player)['valid_moves']
             if player == game.turn_player:
                 self.assertEqual(interface, ['income', 'foreign-aid', 'exchange', 'steal', 'tax'])
             else:

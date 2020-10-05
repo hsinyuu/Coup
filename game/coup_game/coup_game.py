@@ -130,8 +130,11 @@ class CoupGame(object):
             for seat in range(self.MAX_NUM_PLAYERS) \
                 if self.player_seats[seat]]
     
-    def is_game_full(self):
+    def is_full(self):
         return self.get_num_players() == self.MAX_NUM_PLAYERS
+    
+    def is_empty(self):
+        return self.get_num_players() == 0
     
     def get_winner(self):
         players_in_game = [player for player in self.players if player.is_in_game()]
@@ -184,7 +187,7 @@ class CoupGame(object):
         if player_name in self.name_to_player:
             return None
         
-        if self.is_game_full():
+        if self.is_full():
             raise GameIsFull(f"Game {self.name} has reached maximum number of players {self.get_num_players()}")
 
         new_player = CoupGamePlayer(player_name)
@@ -198,6 +201,25 @@ class CoupGame(object):
                 if not player:
                     self.player_seats[seat] = new_player
                     return new_player
+    
+    def remove_player(self, player_name):
+        # Remove the player from datastructures
+        if player_name not in self.name_to_player:
+            return None
+
+        player = self.name_to_player[player_name]
+
+        # Remove the player from seat structure
+        for seat, seated_player in self.player_seats.items():
+            if seated_player == player:
+                self.player_seats[seat] = None
+                break
+
+        # Remove from name player lookup
+        del self.name_to_player[player_name]
+
+        # Remove from player instance list
+        self.players.remove(player)
     
     def player_change_seat(self, player, new_seat):
         assert new_seat <= self.get_num_seats(), f"Seat {new_seat} out of bound"
@@ -251,7 +273,7 @@ class CoupGame(object):
     
     def get_move_timeout(self):
         if self.started:
-            return 3
+            return 25
         else:
             return None
     
