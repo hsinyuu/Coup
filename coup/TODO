@@ -20,6 +20,7 @@ Frontend:
 // These are the fundamental prototype functionality I should have in order to demo the game
 - Lobby
     [X] List of rooms
+    [ ] Periodic update list of rooms
     [ ] Create room
     [ ] Join room
     [ ] Delete room
@@ -38,10 +39,10 @@ Frontend:
 
 Backend:
 [ ] Lobby
-    [ ] Create room handling
-    [ ] Delete if owner
-    [ ] Consumer update new room in db
-    [ ] Consumer update number of players in db
+    [ ] Create room
+    [ ] Consumer update number of players in db when leave
+    [X] Consumer update new room in db
+    [X] Consumer update number of players in db at join
 [X] Define exceptions
 [X] Proper logging support
 [X] PlayerConsumer

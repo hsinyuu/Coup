@@ -11,6 +11,7 @@ from game.coup_game.coup_game import CoupGame, CoupGameFrontend
 from game.coup_game.move import str_to_move
 from game.coup_game.objects import str_to_inf
 from game.coup_game.exceptions import BadPlayerMove, BadGameState, BadTurnState
+from django.db import IntegrityError
 import game.serializers as serializers
 
 class PlayerConsumer(AsyncWebsocketConsumer):
@@ -101,7 +102,6 @@ class RoomManagerConsumer(AsyncConsumer):
         self.channel_layer_sender= ChannelLayerMessageSender(get_channel_layer())
         self.coup_frontend = CoupGameFrontend()
         self.db_interface = RoomManagerToDBInterface()
-
         logging.info('Room manager initialized')
     
     async def game_move(self, event):
@@ -180,6 +180,7 @@ class RoomManagerConsumer(AsyncConsumer):
         room = event.get('room')
         if not room in self.games:
             self.games[room] = CoupGame(room)
+            # It's ok if an entry exist, we will update with latest state using update_room
             await self.db_interface.add_room(room)
         game = self.games[room]
         game.add_player(player)
@@ -251,6 +252,11 @@ class RoomManagerToDBInterface(object):
     @database_sync_to_async
     def load_all_rooms(self):
         return [q.name for q in Room.objects.all()]
+    
+    @database_sync_to_async
+    def reset_database(self):
+        for q in Room.objects.all():
+            q.delete()
 
     @database_sync_to_async
     def add_room(self, room_name):
@@ -259,11 +265,17 @@ class RoomManagerToDBInterface(object):
         try:
             new_room = Room(name=room_name, password="", num_players=1, game_started=False)
             new_room.save()
+        except IntegrityError as ex:
+            if "UNIQUE constraint failed" in ex.args[0]:
+                logging.info(f"Room {room_name} already exist in database. No new entry added.")
+            else:
+                logging.error(f"Error occured while trying to create new room: {ex}")
+            return False
         except Exception as ex:
             logging.error(f"Error occured while trying to create new room: {ex}")
             return False
         return True
-
+    
     @database_sync_to_async
     def update_room(self, room_name, num_players, game_started):
         """Update the fields of the room with the same name as given in the database
